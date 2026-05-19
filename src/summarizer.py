@@ -1,131 +1,52 @@
-from openai import OpenAI
 import os
-import re
+from openai import OpenAI
 
-# =========================
-# API KEY 확인
-# =========================
-
-API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-print("========== DEBUG ==========")
-
-if API_KEY:
-    print("✅ OPENROUTER_API_KEY 로딩 성공")
-    print(f"KEY 앞부분: {API_KEY[:15]}...")
-else:
-    print("❌ OPENROUTER_API_KEY 없음")
-
-print("===========================")
-
-# =========================
-# OpenAI Client 생성
-# =========================
-
+# OpenRouter 클라이언트 설정
 client = OpenAI(
-    api_key=API_KEY,
+    api_key=os.getenv("OPENROUTER_API_KEY"),
     base_url="https://openrouter.ai/api/v1"
 )
 
-# =========================
-# HTML 제거
-# =========================
+def summarize(text):
+    """
+    해외 방산 뉴스 텍스트를
+    1) 한국어 요약
+    2) 중요도 평가
+    3) 태그 생성
+    """
 
-def clean_html(text):
+    if not text:
+        return "❌ 입력 텍스트 없음"
 
-    clean = re.compile('<.*?>')
+    prompt = f"""
+너는 방산 전문 분석가다.
 
-    return re.sub(clean, '', text)
+다음 뉴스를 아래 형식으로 정리해라:
 
-# =========================
-# 기사 요약
-# =========================
+[출력 형식]
+1. 한국어 번역
+2. 3줄 요약
+3. 중요도 (1~5)
+4. 국가 / 군종 / 기업 태그
 
-def summarize(title, summary):
-
-    print("\n===========================")
-    print("📰 기사 요약 시작")
-    print(f"TITLE: {title}")
-    print("===========================\n")
-
-    try:
-
-        summary = clean_html(summary)
-
-        summary = summary[:300]
-
-        prompt = f"""
-다음 해외 방산뉴스를 한국어로 2줄 요약해줘.
-
-반드시 한국어만 사용해라.
-
-기사 제목:
-{title}
-
-기사 내용:
-{summary}
+[기사]
+{text}
 """
 
-        print("📡 OpenRouter API 호출 시작")
-
+    try:
         response = client.chat.completions.create(
-
             model="meta-llama/llama-3-8b-instruct:free",
-
             messages=[
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-
-            max_tokens=100
+            temperature=0.3
         )
 
-        print("✅ OpenRouter API 호출 성공")
-
-        # 응답 체크
-        if (
-            not response.choices
-            or not response.choices[0].message
-            or not response.choices[0].message.content
-        ):
-
-            print("❌ 응답 데이터 없음")
-
-            return f"""
-📰 {title}
-
-요약 결과 없음
-"""
-
-        result = (
-            response
-            .choices[0]
-            .message
-            .content
-            .strip()
-        )
-
-        print("✅ 요약 생성 성공")
-        print("요약 결과:")
-        print(result)
-
-        return f"""
-📰 {title}
-
-{result}
-"""
+        return response.choices[0].message.content
 
     except Exception as e:
-
-        print("\n❌❌❌ API 오류 발생 ❌❌❌")
-        print(type(e))
-        print(str(e))
-        print("❌❌❌❌❌❌❌❌❌❌\n")
-
-        return f"""
-📰 {title}
-
-기사 요약 실패
-"""
+        # GitHub Actions 디버깅용
+        return f"❌ OpenRouter API 오류: {str(e)}"

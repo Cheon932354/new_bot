@@ -2,25 +2,48 @@ import feedparser
 from datetime import datetime, timedelta
 import time
 
-RSS_FEEDS = [
-    "https://www.defensenews.com/arc/outboundfeeds/rss/",
-    "https://www.navalnews.com/feed/",
-    "https://breakingdefense.com/feed/"
-]
+COUNTRY_FEEDS = {
 
-COUNTRY_KEYWORDS = [
-    "Brazil",
-    "Chile",
-    "Peru",
-    "Ecuador",
-    "Colombia",
-    "Argentina",
-    "Vietnam",
-    "Thailand",
-    "Philippines",
-    "Indonesia",
-    "India"
-]
+    "브라질": [
+        "https://www.defesaaereanaval.com.br/feed",
+    ],
+
+    "칠레": [
+        "https://www.infodefensa.com/texto-diario/mostrar/feeds"
+    ],
+
+    "페루": [
+        "https://www.infodefensa.com/peru/rss"
+    ],
+
+    "콜롬비아": [
+        "https://www.infodefensa.com/colombia/rss"
+    ],
+
+    "아르헨티나": [
+        "https://www.infodefensa.com/argentina/rss"
+    ],
+
+    "베트남": [
+        "https://vietnamdefence.com/feed"
+    ],
+
+    "인도네시아": [
+        "https://www.janes.com/feeds/news"
+    ],
+
+    "인도": [
+        "https://www.indiandefensenews.in/feeds/posts/default"
+    ],
+
+    "필리핀": [
+        "https://www.pna.gov.ph/rss"
+    ],
+
+    "태국": [
+        "https://www.bangkokpost.com/rss/data/world.xml"
+    ]
+}
 
 def collect_news():
 
@@ -29,54 +52,44 @@ def collect_news():
     now = datetime.utcnow()
     seven_days_ago = now - timedelta(days=7)
 
-    for url in RSS_FEEDS:
+    for country, feeds in COUNTRY_FEEDS.items():
 
-        try:
+        for url in feeds:
 
-            feed = feedparser.parse(url)
+            try:
 
-            for entry in feed.entries:
+                feed = feedparser.parse(url)
 
-                title = entry.get("title", "")
-                summary = entry.get("summary", "")
-                link = entry.get("link", "")
+                for entry in feed.entries[:10]:
 
-                published = None
+                    title = entry.get("title", "")
+                    summary = entry.get("summary", "")
+                    link = entry.get("link", "")
 
-                if "published_parsed" in entry:
+                    published = None
 
-                    published = datetime.fromtimestamp(
-                        time.mktime(entry.published_parsed)
-                    )
+                    if "published_parsed" in entry:
 
-                # 최근 7일 기사만
-                if published and published < seven_days_ago:
-                    continue
+                        published = datetime.fromtimestamp(
+                            time.mktime(
+                                entry.published_parsed
+                            )
+                        )
 
-                combined_text = (
-                    title.lower() + " " + summary.lower()
-                )
+                    # 최근 7일
+                    if published and published < seven_days_ago:
+                        continue
 
-                matched = False
+                    articles.append({
+                        "country": country,
+                        "title": title,
+                        "summary": summary,
+                        "link": link
+                    })
 
-                for keyword in COUNTRY_KEYWORDS:
+            except Exception as e:
 
-                    if keyword.lower() in combined_text:
-                        matched = True
-                        break
-
-                if not matched:
-                    continue
-
-                articles.append({
-                    "title": title,
-                    "summary": summary,
-                    "link": link
-                })
-
-        except Exception as e:
-
-            print(f"RSS 오류: {url}")
-            print(e)
+                print(f"RSS 오류: {url}")
+                print(e)
 
     return articles

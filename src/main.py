@@ -4,6 +4,7 @@ from telegram import Bot
 from telegram.ext import Updater, CallbackQueryHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import os
+import time
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -72,27 +73,56 @@ def button_callback(update, context):
     if country == "close":
 
         query.edit_message_text(
-            "브리핑을 종료합니다."
+            "❌ 브리핑을 종료합니다."
         )
 
         return
 
     articles = news_cache.get(country, [])
 
-    message = f"📡 {country} 방산 뉴스\n\n"
+    # 1단계
+    query.edit_message_text(
+        f"📡 {country} 뉴스 수집중..."
+    )
+
+    time.sleep(1)
+
+    # 2단계
+    query.edit_message_text(
+        f"🤖 {country} AI 요약중..."
+    )
+
+    time.sleep(1)
+
+    # 3단계
+    message = f"✅ {country} 방산 뉴스 브리핑 완료\n\n"
 
     for article in articles[:5]:
 
-        summarized = summarize(
-            article["title"] + "\n" + article["summary"]
-        )
+        try:
 
-        short_summary = summarized[:120]
+            summarized = summarize(
+                article["title"] + "\n" + article["summary"]
+            )
 
-        message += f"""
+            short_summary = summarized[:120]
+
+            message += f"""
 📰 {article['title']}
 
 → {short_summary}
+
+🔗 {article['link']}
+
+----------------
+"""
+
+        except Exception as e:
+
+            message += f"""
+📰 {article['title']}
+
+→ 요약 실패
 
 🔗 {article['link']}
 

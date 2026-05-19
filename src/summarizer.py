@@ -2,12 +2,35 @@ from openai import OpenAI
 import os
 import re
 
+# =========================
+# API KEY 확인
+# =========================
+
+API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+print("========== DEBUG ==========")
+
+if API_KEY:
+    print("✅ OPENROUTER_API_KEY 로딩 성공")
+    print(f"KEY 앞부분: {API_KEY[:15]}...")
+else:
+    print("❌ OPENROUTER_API_KEY 없음")
+
+print("===========================")
+
+# =========================
+# OpenAI Client 생성
+# =========================
+
 client = OpenAI(
-    api_key=os.getenv("OPENROUTER_API_KEY"),
+    api_key=API_KEY,
     base_url="https://openrouter.ai/api/v1"
 )
 
+# =========================
 # HTML 제거
+# =========================
+
 def clean_html(text):
 
     clean = re.compile('<.*?>')
@@ -15,59 +38,15 @@ def clean_html(text):
     return re.sub(clean, '', text)
 
 # =========================
-# 제목 번역
-# =========================
-
-def translate_title(title):
-
-    try:
-
-        prompt = f"""
-다음 해외 방산뉴스 제목을
-반드시 자연스러운 한국어 제목으로 번역해라.
-
-영어를 그대로 출력하지 마라.
-
-뉴스 제목:
-{title}
-"""
-
-        response = client.chat.completions.create(
-
-            model="meta-llama/llama-3-8b-instruct:free",
-
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-
-            max_tokens=60
-        )
-
-        result = (
-            response
-            .choices[0]
-            .message
-            .content
-            .strip()
-        )
-
-        return result
-
-    except Exception as e:
-
-        print("제목 번역 오류:")
-        print(str(e))
-
-        return title
-
-# =========================
 # 기사 요약
 # =========================
 
 def summarize(title, summary):
+
+    print("\n===========================")
+    print("📰 기사 요약 시작")
+    print(f"TITLE: {title}")
+    print("===========================\n")
 
     try:
 
@@ -75,12 +54,8 @@ def summarize(title, summary):
 
         summary = summary[:300]
 
-        # 제목 먼저 번역
-        korean_title = translate_title(title)
-
         prompt = f"""
-다음 해외 방산뉴스를
-한국어로 2줄만 요약해줘.
+다음 해외 방산뉴스를 한국어로 2줄 요약해줘.
 
 반드시 한국어만 사용해라.
 
@@ -91,6 +66,8 @@ def summarize(title, summary):
 {summary}
 """
 
+        print("📡 OpenRouter API 호출 시작")
+
         response = client.chat.completions.create(
 
             model="meta-llama/llama-3-8b-instruct:free",
@@ -102,10 +79,27 @@ def summarize(title, summary):
                 }
             ],
 
-            max_tokens=120
+            max_tokens=100
         )
 
-        summary_result = (
+        print("✅ OpenRouter API 호출 성공")
+
+        # 응답 체크
+        if (
+            not response.choices
+            or not response.choices[0].message
+            or not response.choices[0].message.content
+        ):
+
+            print("❌ 응답 데이터 없음")
+
+            return f"""
+📰 {title}
+
+요약 결과 없음
+"""
+
+        result = (
             response
             .choices[0]
             .message
@@ -113,22 +107,25 @@ def summarize(title, summary):
             .strip()
         )
 
-        final_result = f"""
-{korean_title}
-({title})
+        print("✅ 요약 생성 성공")
+        print("요약 결과:")
+        print(result)
 
-{summary_result}
+        return f"""
+📰 {title}
+
+{result}
 """
-
-        return final_result
 
     except Exception as e:
 
-        print("요약 오류:")
+        print("\n❌❌❌ API 오류 발생 ❌❌❌")
+        print(type(e))
         print(str(e))
+        print("❌❌❌❌❌❌❌❌❌❌\n")
 
         return f"""
-{title}
+📰 {title}
 
 기사 요약 실패
 """

@@ -14,40 +14,80 @@ def clean_html(text):
 
     return re.sub(clean, '', text)
 
+# =========================
+# 제목 번역
+# =========================
+
+def translate_title(title):
+
+    try:
+
+        prompt = f"""
+다음 해외 방산뉴스 제목을
+반드시 자연스러운 한국어 제목으로 번역해라.
+
+영어를 그대로 출력하지 마라.
+
+뉴스 제목:
+{title}
+"""
+
+        response = client.chat.completions.create(
+
+            model="meta-llama/llama-3-8b-instruct:free",
+
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+
+            max_tokens=60
+        )
+
+        result = (
+            response
+            .choices[0]
+            .message
+            .content
+            .strip()
+        )
+
+        return result
+
+    except Exception as e:
+
+        print("제목 번역 오류:")
+        print(str(e))
+
+        return title
+
+# =========================
+# 기사 요약
+# =========================
+
 def summarize(title, summary):
 
     try:
 
-        # HTML 제거
         summary = clean_html(summary)
 
-        # 너무 긴 내용 제거
         summary = summary[:300]
 
+        # 제목 먼저 번역
+        korean_title = translate_title(title)
+
         prompt = f"""
-당신은 한국 방산 전문 뉴스 브리퍼다.
+다음 해외 방산뉴스를
+한국어로 2줄만 요약해줘.
 
-반드시 모든 내용을 한국어로 번역해서 출력해라.
+반드시 한국어만 사용해라.
 
-영어 문장을 그대로 출력하지 마라.
-
-출력 형식:
-
-[한글 기사 제목]
-(원문 영문 제목)
-
-한국어 기사 내용 2줄 요약
-
-규칙:
-- 반드시 한국어 사용
-- 자연스럽게 번역
-- 핵심만 간단히
-- 2줄 이내 요약
-
-원문 기사 제목:
+기사 제목:
 {title}
 
-원문 기사 내용:
+기사 내용:
 {summary}
 """
 
@@ -62,23 +102,10 @@ def summarize(title, summary):
                 }
             ],
 
-            max_tokens=180
+            max_tokens=120
         )
 
-        # 응답 체크
-        if (
-            not response.choices
-            or not response.choices[0].message
-            or not response.choices[0].message.content
-        ):
-
-            return f"""
-{title}
-
-번역 결과 없음
-"""
-
-        result = (
+        summary_result = (
             response
             .choices[0]
             .message
@@ -86,7 +113,14 @@ def summarize(title, summary):
             .strip()
         )
 
-        return result
+        final_result = f"""
+{korean_title}
+({title})
+
+{summary_result}
+"""
+
+        return final_result
 
     except Exception as e:
 

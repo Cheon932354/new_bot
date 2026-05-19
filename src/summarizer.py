@@ -21,34 +21,39 @@ def summarize(title, summary):
         # HTML 제거
         summary = clean_html(summary)
 
-        # 너무 긴 내용 자르기
-        summary = summary[:500]
+        # 너무 긴 내용 제거
+        summary = summary[:300]
 
         prompt = f"""
-다음 해외 방산뉴스를 한국어 브리핑 형식으로 정리해줘.
+당신은 한국 방산 전문 뉴스 브리퍼다.
 
-반드시 아래 형식으로 출력:
+반드시 모든 내용을 한국어로 번역해서 출력해라.
+
+영어 문장을 그대로 출력하지 마라.
+
+출력 형식:
 
 [한글 기사 제목]
-(영문 기사 제목)
+(원문 영문 제목)
 
-기사 내용 2줄 요약
+한국어 기사 내용 2줄 요약
 
-조건:
-- 자연스러운 한국어
-- 핵심만
-- 너무 길지 않게
+규칙:
+- 반드시 한국어 사용
+- 자연스럽게 번역
+- 핵심만 간단히
+- 2줄 이내 요약
 
-기사 제목:
+원문 기사 제목:
 {title}
 
-기사 내용:
+원문 기사 내용:
 {summary}
 """
 
         response = client.chat.completions.create(
 
-            model="google/gemma-2-9b-it:free",
+            model="meta-llama/llama-3-8b-instruct:free",
 
             messages=[
                 {
@@ -57,10 +62,10 @@ def summarize(title, summary):
                 }
             ],
 
-            max_tokens=150
+            max_tokens=180
         )
 
-        # 응답 안정성 체크
+        # 응답 체크
         if (
             not response.choices
             or not response.choices[0].message
@@ -70,7 +75,7 @@ def summarize(title, summary):
             return f"""
 {title}
 
-요약 결과 없음
+번역 결과 없음
 """
 
         result = (

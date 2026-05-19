@@ -1,201 +1,96 @@
+import os
 from collector import collect_news
 from summarizer import summarize
-from telegram import Bot
-from telegram.ext import Updater, CallbackQueryHandler
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-import os
-import time
+from telegram_sender import send_message
 
-TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+def debug_env():
+    print("\n========== ENV CHECK ==========")
 
-bot = Bot(token=TOKEN)
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    telegram_token = os.getenv("TELEGRAM_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
 
-news_cache = {}
+    print("OPENROUTER_API_KEY:",
+          "OK" if openrouter_key else "MISSING")
 
-COUNTRIES = {
-    "브라질": "🇧🇷",
-    "칠레": "🇨🇱",
-    "페루": "🇵🇪",
-    "에콰도르": "🇪🇨",
-    "콜롬비아": "🇨🇴",
-    "아르헨티나": "🇦🇷",
-    "베트남": "🇻🇳",
-    "태국": "🇹🇭",
-    "필리핀": "🇵🇭",
-    "인도네시아": "🇮🇩",
-    "인도": "🇮🇳",
-    "한국기업": "🇰🇷"
-}
+    print("TELEGRAM_TOKEN:",
+          "OK" if telegram_token else "MISSING")
 
-# =========================
-# 국가별 그룹화
-# =========================
+    print("TELEGRAM_CHAT_ID:",
+          chat_id if chat_id else "MISSING")
 
-def group_news_by_country(news):
-
-    grouped = {}
-
-    for article in news:
-
-        country = article["country"]
-
-        grouped.setdefault(country, []).append(article)
-
-    return grouped
-
-# =========================
-# 버튼 생성
-# =========================
-
-def create_country_buttons():
-
-    keyboard = []
-
-    for country in news_cache.keys():
-
-        flag = COUNTRIES.get(country, "🌐")
-
-        count = len(news_cache[country])
-
-        keyboard.append([
-            InlineKeyboardButton(
-                f"{flag} {country} ({count})",
-                callback_data=country
-            )
-        ])
-
-    keyboard.append([
-        InlineKeyboardButton(
-            "❌ 종료",
-            callback_data="close"
-        )
-    ])
-
-    return InlineKeyboardMarkup(keyboard)
-
-# =========================
-# 버튼 클릭 처리
-# =========================
-
-def button_callback(update, context):
-
-    query = update.callback_query
-    query.answer()
-
-    country = query.data
-
-    # 종료 버튼
-    if country == "close":
-
-        query.edit_message_text(
-            "❌ 브리핑 종료"
-        )
-
-        return
-
-    articles = news_cache.get(country, [])
-
-    # 로딩 UI
-    query.edit_message_text(
-        f"📡 {country} 뉴스 수집중..."
-    )
-
-    time.sleep(1)
-
-    query.edit_message_text(
-        f"🤖 {country} AI 요약중..."
-    )
-
-    time.sleep(1)
-
-    message = f"✅ {country} 방산뉴스 브리핑\n\n"
-
-    # 기사 3개만 출력 (안정화)
-    for article in articles[:3]:
-
-        summarized = summarize(
-            article["title"],
-            article["summary"]
-        )
-
-        message += f"""
-📰 {summarized}
-
-🔗 원문 링크
-{article['link']}
-
-----------------
-"""
-
-    # Telegram 길이 제한 안정화
-    if len(message) > 3500:
-
-        message = message[:3500]
-
-    # 버튼 유지
-    keyboard = create_country_buttons()
-
-    query.edit_message_text(
-        text=message,
-        reply_markup=keyboard
-    )
-
-# =========================
-# 메인
-# =========================
+    print("================================\n")
 
 def main():
 
-    global news_cache
+    # 1. 환경변수 체크
+    debug_env()
 
+    # 2. 뉴스 수집 테스트
+    print("[STEP 1] Collecting news...")
     news = collect_news()
 
-    news_cache = group_news_by_country(news)
+    print(f"Collected articles: {len(news)}")
 
-    keyboard = create_country_buttons()
+    if not news:
+        print("❌ 뉴스 수집 실패")
+        return
 
-    summary_message = (
-        "📡 해외 방산 브리핑\n\n"
-    )
+    # 3. AI 요약 테스트 (1개만 먼저)
+    print("\n[STEP 2] Testing OpenRouter API...")
 
-    total_articles = 0
+    test_article = news[0]["title"] + "\n" + news[0]["summary"]
 
-    for country, articles in news_cache.items():
+    try:
+        summary = summarize(test_article)
+        print("✅ AI Summary 성공:\n")
+        print(summary)
 
-        flag = COUNTRIES.get(country, "🌐")
+    except Exception as e:
+        print("❌ AI API 실패:")
+        print(str(e))
+        return
 
-        summary_message += (
-            f"{flag} {country} ({len(articles)})\n"
-        )
+    # 4. Telegram 테스트
+    print("\n[STEP 3] Sending Telegram message...")
 
-        total_articles += len(articles)
+    try:
+        send_message("🧪 테스트 메시지: API 정상 동작 확인")
+        print("✅ Telegram 성공")
 
-    summary_message += (
-        f"\n📰 최근 7일 기사 수: {total_articles}건\n\n"
-        "원하는 국가를 선택하세요."
-    )
+    except Exception as e:
+        print("❌ Telegram 실패:")
+        print(str(e))
+        return
 
-    bot.send_message(
-        chat_id=CHAT_ID,
-        text=summary_message,
-        reply_markup=keyboard
-    )
+    # 5. 전체 브리핑 테스트
+    print("\n[STEP 4] Full briefing test...")
 
-    updater = Updater(
-        TOKEN,
-        use_context=True
-    )
+    final_message = "📡 방산 브리핑 테스트\n\n"
 
-    dispatcher = updater.dispatcher
+    for article in news[:3]:
 
-    dispatcher.add_handler(
-        CallbackQueryHandler(button_callback)
-    )
+        try:
+            summarized = summarize(
+                article["title"] + "\n" + article["summary"]
+            )
 
-    updater.start_polling()
+            final_message += f"""
+📰 {article['title']}
 
-    updater.idle()
+{summarized}
+
+🔗 {article['link']}
+--------------------
+"""
+
+        except Exception as e:
+            print("요약 실패:", article["title"])
+            print(str(e))
+
+    send_message(final_message)
+
+    print("\n🎉 전체 프로세스 완료")
 
 if __name__ == "__main__":
     main()

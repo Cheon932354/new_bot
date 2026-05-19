@@ -28,6 +28,10 @@ COUNTRIES = {
     "한국기업": "🇰🇷"
 }
 
+# =========================
+# 국가별 뉴스 그룹화
+# =========================
+
 def group_news_by_country(news):
 
     grouped = {}
@@ -52,9 +56,11 @@ def create_country_buttons():
 
         flag = COUNTRIES.get(country, "🌐")
 
+        count = len(news_cache[country])
+
         keyboard.append([
             InlineKeyboardButton(
-                f"{flag} {country}",
+                f"{flag} {country} ({count})",
                 callback_data=country
             )
         ])
@@ -90,14 +96,13 @@ def button_callback(update, context):
 
     articles = news_cache.get(country, [])
 
-    # 뉴스 수집중 UI
+    # 로딩 UI
     query.edit_message_text(
         f"📡 {country} 뉴스 수집중..."
     )
 
     time.sleep(1)
 
-    # AI 요약중 UI
     query.edit_message_text(
         f"🤖 {country} AI 요약중..."
     )
@@ -110,15 +115,15 @@ def button_callback(update, context):
     for article in articles[:5]:
 
         summarized = summarize(
-            article["title"]
+            article["title"],
+            article["summary"]
         )
 
         message += f"""
-📰 {article['title']}
+📰 {summarized}
 
-→ {summarized}
-
-🔗 {article['link']}
+🔗 원문 링크
+{article['link']}
 
 ----------------
 """
@@ -126,7 +131,7 @@ def button_callback(update, context):
     # 다시 버튼 생성
     keyboard = create_country_buttons()
 
-    # 기사 + 버튼 함께 출력
+    # 기사 + 버튼 같이 출력
     query.edit_message_text(
         text=message,
         reply_markup=keyboard

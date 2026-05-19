@@ -1,7 +1,6 @@
 import os
 from openai import OpenAI
 
-# OpenRouter 클라이언트
 client = OpenAI(
     api_key=os.getenv("OPENROUTER_API_KEY"),
     base_url="https://openrouter.ai/api/v1"
@@ -15,11 +14,11 @@ def summarize(text):
     prompt = f"""
 너는 방산 전문 분석가다.
 
-다음 해외 방산 뉴스를 한국어로 정리해라:
+다음 해외 방산 뉴스를 아래 형식으로 정리해라:
 
-[필수 출력 형식]
+[출력 형식]
 1. 한국어 번역
-2. 3줄 핵심 요약
+2. 3줄 요약
 3. 중요도 (1~5)
 4. 국가 / 군종 / 기업 태그
 
@@ -29,9 +28,9 @@ def summarize(text):
 
     try:
         response = client.chat.completions.create(
-            # ✅ 안정적으로 동작하는 OpenRouter 모델
-            model="mistralai/mistral-7b-instruct",
-            
+            # ✅ 현재 OpenRouter에서 안정적으로 동작하는 모델
+            model="google/gemma-7b-it",
+
             messages=[
                 {"role": "user", "content": prompt}
             ],

@@ -29,7 +29,7 @@ COUNTRIES = {
 }
 
 # =========================
-# 국가별 뉴스 그룹화
+# 국가별 그룹화
 # =========================
 
 def group_news_by_country(news):
@@ -111,8 +111,8 @@ def button_callback(update, context):
 
     message = f"✅ {country} 방산뉴스 브리핑\n\n"
 
-    # 기사 출력
-    for article in articles[:5]:
+    # 기사 3개만 출력 (안정화)
+    for article in articles[:3]:
 
         summarized = summarize(
             article["title"],
@@ -128,10 +128,14 @@ def button_callback(update, context):
 ----------------
 """
 
-    # 다시 버튼 생성
+    # Telegram 길이 제한 안정화
+    if len(message) > 3500:
+
+        message = message[:3500]
+
+    # 버튼 유지
     keyboard = create_country_buttons()
 
-    # 기사 + 버튼 같이 출력
     query.edit_message_text(
         text=message,
         reply_markup=keyboard

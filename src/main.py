@@ -3,94 +3,91 @@ from collector import collect_news
 from summarizer import summarize
 from telegram_sender import send_message
 
+
 def debug_env():
     print("\n========== ENV CHECK ==========")
 
-    openrouter_key = os.getenv("OPENROUTER_API_KEY")
-    telegram_token = os.getenv("TELEGRAM_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
-
     print("OPENROUTER_API_KEY:",
-          "OK" if openrouter_key else "MISSING")
+          "OK" if os.getenv("OPENROUTER_API_KEY") else "MISSING")
 
     print("TELEGRAM_TOKEN:",
-          "OK" if telegram_token else "MISSING")
+          "OK" if os.getenv("TELEGRAM_TOKEN") else "MISSING")
 
     print("TELEGRAM_CHAT_ID:",
-          chat_id if chat_id else "MISSING")
+          os.getenv("TELEGRAM_CHAT_ID") or "MISSING")
 
     print("================================\n")
 
+
 def main():
 
-    # 1. 환경변수 체크
+    # 1. 환경 확인
     debug_env()
 
-    # 2. 뉴스 수집 테스트
+    # 2. 뉴스 수집
     print("[STEP 1] Collecting news...")
     news = collect_news()
-
-    print(f"Collected articles: {len(news)}")
 
     if not news:
         print("❌ 뉴스 수집 실패")
         return
 
-    # 3. AI 요약 테스트 (1개만 먼저)
-    print("\n[STEP 2] Testing OpenRouter API...")
+    print(f"Collected: {len(news)} articles")
 
-    test_article = news[0]["title"] + "\n" + news[0]["summary"]
+    # 3. OpenRouter 테스트 (1개만)
+    print("\n[STEP 2] Testing AI summarizer...")
 
     try:
-        summary = summarize(test_article)
-        print("✅ AI Summary 성공:\n")
-        print(summary)
+        test_text = news[0]["title"] + "\n" + news[0]["summary"]
+
+        result = summarize(test_text)
+
+        print("✅ AI 결과:\n")
+        print(result)
 
     except Exception as e:
-        print("❌ AI API 실패:")
-        print(str(e))
+        print("❌ AI 오류:", str(e))
         return
 
     # 4. Telegram 테스트
-    print("\n[STEP 3] Sending Telegram message...")
+    print("\n[STEP 3] Telegram test...")
 
     try:
-        send_message("🧪 테스트 메시지: API 정상 동작 확인")
-        print("✅ Telegram 성공")
+        send_message("🧪 테스트 성공: 봇 정상 작동")
+        print("✅ Telegram OK")
 
     except Exception as e:
-        print("❌ Telegram 실패:")
-        print(str(e))
+        print("❌ Telegram 오류:", str(e))
         return
 
-    # 5. 전체 브리핑 테스트
-    print("\n[STEP 4] Full briefing test...")
+    # 5. 전체 브리핑 생성
+    print("\n[STEP 4] Full briefing...")
 
-    final_message = "📡 방산 브리핑 테스트\n\n"
+    final_message = "📡 해외 방산 브리핑\n\n"
 
     for article in news[:3]:
 
+        text = article["title"] + "\n" + article["summary"]
+
         try:
-            summarized = summarize(
-                article["title"] + "\n" + article["summary"]
-            )
+            summary = summarize(text)
 
             final_message += f"""
 📰 {article['title']}
 
-{summarized}
+{summary}
 
 🔗 {article['link']}
---------------------
+-----------------------
 """
 
         except Exception as e:
-            print("요약 실패:", article["title"])
-            print(str(e))
+            print("요약 실패:", article["title"], e)
 
     send_message(final_message)
 
-    print("\n🎉 전체 프로세스 완료")
+    print("\n🎉 완료")
+
 
 if __name__ == "__main__":
     main()

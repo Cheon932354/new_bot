@@ -7,13 +7,16 @@ from collector import collect_news
 from summarizer import summarize
 
 
+# =========================
+# Telegram 설정
+# =========================
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 BASE = f"https://api.telegram.org/bot{TOKEN}"
 
 
 # =========================
-# Telegram 기본 함수
+# 메시지 전송
 # =========================
 def send_message(text, reply_markup=None):
 
@@ -31,6 +34,9 @@ def send_message(text, reply_markup=None):
     return r.json()["result"]["message_id"]
 
 
+# =========================
+# 메시지 수정 (진행상황)
+# =========================
 def edit_message(message_id, text):
 
     data = {
@@ -95,23 +101,41 @@ def group_news(news_list):
 
 
 # =========================
-# 🔥 핵심: 진행상황 포함 브리핑
+# UI 키보드 생성
+# =========================
+def build_keyboard(grouped):
+
+    keyboard = []
+
+    for k, v in grouped.items():
+        keyboard.append([{
+            "text": f"{k} ({len(v)})",
+            "callback_data": f"RUN|{k}"
+        }])
+
+    keyboard.append([{
+        "text": "❌ 종료",
+        "callback_data": "EXIT"
+    }])
+
+    return json.dumps({"inline_keyboard": keyboard})
+
+
+# =========================
+# 브리핑 실행 (핵심 UX)
 # =========================
 def run_country(country, articles):
 
-    # 1️⃣ 시작 메시지
     msg_id = send_message(f"📡 {country} 뉴스 수집 중...")
 
     time.sleep(0.5)
 
-    edit_message(msg_id, f"📥 기사 {len(articles)}개 분석 준비 완료")
+    edit_message(msg_id, f"📥 기사 {len(articles)}개 확인 완료")
 
     result = f"📊 <b>{country} 방산 브리핑</b>\n\n"
 
-    # 2️⃣ 요약 진행 루프
     for i, a in enumerate(articles):
 
-        # ⏳ 진행 상태 표시 (핵심)
         edit_message(
             msg_id,
             f"⏳ 요약 진행 중...\n{i+1}/{len(articles)}"
@@ -120,7 +144,7 @@ def run_country(country, articles):
         try:
             summary = summarize(a["title"] + " " + a["summary"])
         except Exception as e:
-            summary = f"❌ 요약 실패: {str(e)}"
+            summary = f"❌ 요약 실패: {e}"
 
         result += f"""
 📰 {a['title']}
@@ -131,48 +155,87 @@ def run_country(country, articles):
 -----------------------
 """
 
-        # ⭐ Telegram rate limit 방지 (중요)
         time.sleep(0.8)
 
-    # 3️⃣ 완료 상태
     edit_message(msg_id, "✅ 요약 완료!")
-
-    time.sleep(0.5)
 
     send_message(result)
 
-    send_message("➡ 다른 국가를 선택하거나 종료하세요")
+
+# =========================
+# callback 처리
+# =========================
+def handle_callback(data):
+
+    if data == "EXIT":
+        send_message("❌ 종료되었습니다.")
+        return
+
+    if data.startswith("RUN|"):
+
+        country = data.split("|")[1]
+
+        news = collect_news()
+        grouped = group_news(news)
+
+        articles = grouped.get(country, [])
+
+        run_country(country, articles)
 
 
 # =========================
-# MAIN
+# Telegram polling (핵심)
+# =========================
+def listen_callbacks():
+
+    last_update_id = None
+
+    while True:
+
+        url = f"{BASE}/getUpdates"
+
+        if last_update_id:
+            url += f"?offset={last_update_id + 1}"
+
+        try:
+            res = requests.get(url).json()
+
+            for update in res.get("result", []):
+
+                last_update_id = update["update_id"]
+
+                if "callback_query" in update:
+
+                    data = update["callback_query"]["data"]
+
+                    handle_callback(data)
+
+        except Exception as e:
+            print("polling error:", e)
+
+        time.sleep(1)
+
+
+# =========================
+# MAIN 실행
 # =========================
 def main():
 
     news = collect_news()
-
     grouped = group_news(news)
 
-    keyboard = []
-
-    for k, v in grouped.items():
-        keyboard.append([{
-            "text": f"{k} ({len(v)})",
-            "callback_data": k
-        }])
-
-    keyboard.append([{
-        "text": "❌ 종료",
-        "callback_data": "exit"
-    }])
+    keyboard = build_keyboard(grouped)
 
     send_message(
         "🌍 국가를 선택하세요",
-        reply_markup=json.dumps({"inline_keyboard": keyboard})
+        reply_markup=keyboard
     )
 
-    print("UI 전송 완료")
+    print("UI sent")
+
+    listen_callbacks()
 
 
+# =========================
 if __name__ == "__main__":
     main()

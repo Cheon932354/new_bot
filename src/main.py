@@ -24,7 +24,8 @@ COUNTRIES = {
     "태국": "🇹🇭",
     "필리핀": "🇵🇭",
     "인도네시아": "🇮🇩",
-    "인도": "🇮🇳"
+    "인도": "🇮🇳",
+    "한국기업": "🇰🇷"
 }
 
 def group_news_by_country(news):
@@ -73,56 +74,37 @@ def button_callback(update, context):
     if country == "close":
 
         query.edit_message_text(
-            "❌ 브리핑을 종료합니다."
+            "❌ 브리핑 종료"
         )
 
         return
 
     articles = news_cache.get(country, [])
 
-    # 1단계
     query.edit_message_text(
         f"📡 {country} 뉴스 수집중..."
     )
 
     time.sleep(1)
 
-    # 2단계
     query.edit_message_text(
         f"🤖 {country} AI 요약중..."
     )
 
     time.sleep(1)
 
-    # 3단계
-    message = f"✅ {country} 방산 뉴스 브리핑 완료\n\n"
+    message = f"✅ {country} 방산뉴스 브리핑\n\n"
 
     for article in articles[:5]:
 
-        try:
+        summarized = summarize(
+            article["title"]
+        )
 
-            summarized = summarize(
-                article["title"] + "\n" + article["summary"]
-            )
-
-            short_summary = summarized[:120]
-
-            message += f"""
+        message += f"""
 📰 {article['title']}
 
-→ {short_summary}
-
-🔗 {article['link']}
-
-----------------
-"""
-
-        except Exception as e:
-
-            message += f"""
-📰 {article['title']}
-
-→ 요약 실패
+→ {summarized}
 
 🔗 {article['link']}
 
@@ -141,10 +123,8 @@ def main():
 
     keyboard = create_buttons(news_cache)
 
-    summary_message = "📡 해외 방산 브리핑\n\n"
-
-    summary_message += (
-        "🌏 아시아 / 🌎 중남미 뉴스 현황\n\n"
+    summary_message = (
+        "📡 해외 방산 브리핑\n\n"
     )
 
     total_articles = 0
@@ -154,13 +134,13 @@ def main():
         flag = COUNTRIES.get(country, "🌐")
 
         summary_message += (
-            f"{flag} {country} : {len(articles)}건\n"
+            f"{flag} {country} ({len(articles)})\n"
         )
 
         total_articles += len(articles)
 
     summary_message += (
-        f"\n📰 최근 7일 수집 기사 수: {total_articles}건"
+        f"\n📰 최근 7일 기사 수: {total_articles}건"
     )
 
     bot.send_message(

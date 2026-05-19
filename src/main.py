@@ -16,7 +16,7 @@ BASE = f"https://api.telegram.org/bot{TOKEN}"
 
 
 # =========================
-# TELEGRAM
+# TELEGRAM SEND
 # =========================
 def send_message(text):
 
@@ -53,6 +53,7 @@ def detect_country(text):
         "vietnam":"🇻🇳 베트남",
         "thailand":"🇹🇭 태국",
         "bangladesh":"🇧🇩 방글라데시",
+        "india":"🇮🇳 인도",
 
         "peru":"🇵🇪 페루",
         "chile":"🇨🇱 칠레",
@@ -82,6 +83,7 @@ def group_news(news):
         "🇻🇳 베트남": [],
         "🇹🇭 태국": [],
         "🇧🇩 방글라데시": [],
+        "🇮🇳 인도": [],
 
         "🇵🇪 페루": [],
         "🇨🇱 칠레": [],
@@ -95,8 +97,8 @@ def group_news(news):
 
     for n in news:
 
-        title = n.get("title","")
-        summary = n.get("summary","")
+        title = n.get("title", "")
+        summary = n.get("summary", "")
 
         country = detect_country(title + summary)
 
@@ -106,9 +108,9 @@ def group_news(news):
 
 
 # =========================
-# 1차 메시지 (카운트)
+# COUNT MESSAGE
 # =========================
-def send_count(grouped):
+def build_count_message(grouped):
 
     date = get_date()
 
@@ -117,13 +119,13 @@ def send_count(grouped):
     for country, articles in grouped.items():
         msg += f"{country} : {len(articles)}건\n"
 
-    send_message(msg)
+    return msg
 
 
 # =========================
-# 2차 메시지 (카드 UI)
+# SUMMARY MESSAGE (날짜 + 발행일 포함)
 # =========================
-def send_summary(grouped):
+def build_summary_message(grouped):
 
     msg = "📡 <b>방산 브리핑 리포트</b>\n"
 
@@ -137,17 +139,23 @@ def send_summary(grouped):
 
         for a in articles[:5]:
 
-            title = a.get("title","")
-            summary_raw = a.get("summary","")
-            link = a.get("link","")
+            title = a.get("title", "")
+            summary_raw = a.get("summary", "")
+            link = a.get("link", "")
 
-            # 날짜 처리 (있으면 표시)
-            published = a.get("date") or a.get("published") or ""
+            # 🔥 발행일 통합 처리
+            published = (
+                a.get("published")
+                or a.get("date")
+                or a.get("pubDate")
+                or ""
+            )
 
             if published:
+                published = str(published)[:10]
                 title_line = f"{title} ({published})"
             else:
-                title_line = title
+                title_line = f"{title} (No date)"
 
             if not title or not summary_raw:
                 continue
@@ -170,7 +178,7 @@ def send_summary(grouped):
 
         msg += "\n"
 
-    send_message(msg)
+    return msg
 
 
 # =========================
@@ -184,8 +192,13 @@ def main():
 
     grouped = group_news(news)
 
-    send_count(grouped)
-    send_summary(grouped)
+    # 🔥 모든 요약 완료 후 메시지 생성
+    count_msg = build_count_message(grouped)
+    summary_msg = build_summary_message(grouped)
+
+    # 🔥 순차 전송
+    send_message(count_msg)
+    send_message(summary_msg)
 
     print("✅ 완료")
 

@@ -8,15 +8,17 @@ from summarizer import summarize
 
 
 # =========================
-# Telegram 설정
+# ENV
 # =========================
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
 BASE = f"https://api.telegram.org/bot{TOKEN}"
 
 
 # =========================
-# 메시지 전송
+# TELEGRAM
 # =========================
 def send_message(text, reply_markup=None):
 
@@ -30,13 +32,9 @@ def send_message(text, reply_markup=None):
         data["reply_markup"] = reply_markup
 
     r = requests.post(BASE + "/sendMessage", json=data)
-
     return r.json()["result"]["message_id"]
 
 
-# =========================
-# 메시지 수정 (진행상황)
-# =========================
 def edit_message(message_id, text):
 
     data = {
@@ -49,7 +47,74 @@ def edit_message(message_id, text):
 
 
 # =========================
-# 국가 분류
+# AI 국가 분류
+# =========================
+def ai_detect_country(text):
+
+    if not OPENROUTER_API_KEY:
+        return "🌍 기타 국가"
+
+    try:
+        res = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "openai/gpt-4o-mini",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "Return ONLY a country name like Japan, Brazil, India, Philippines. If unclear return Other."
+                    },
+                    {
+                        "role": "user",
+                        "content": text[:1000]
+                    }
+                ],
+                "temperature": 0.2
+            },
+            timeout=10
+        )
+
+        result = res.json()["choices"][0]["message"]["content"].strip()
+
+        return normalize_country(result)
+
+    except:
+        return "🌍 기타 국가"
+
+
+# =========================
+# 국가 정규화
+# =========================
+def normalize_country(name):
+
+    name = name.lower()
+
+    mapping = {
+        "japan": "🇯🇵 일본",
+        "philippines": "🇵🇭 필리핀",
+        "indonesia": "🇮🇩 인도네시아",
+        "malaysia": "🇲🇾 말레이시아",
+        "vietnam": "🇻🇳 베트남",
+        "thailand": "🇹🇭 태국",
+        "bangladesh": "🇧🇩 방글라데시",
+
+        "peru": "🇵🇪 페루",
+        "chile": "🇨🇱 칠레",
+        "colombia": "🇨🇴 콜롬비아",
+        "argentina": "🇦🇷 아르헨티나",
+        "mexico": "🇲🇽 멕시코",
+        "brazil": "🇧🇷 브라질"
+    }
+
+    return mapping.get(name, "🌍 기타 국가")
+
+
+# =========================
+# 하이브리드 국가 감지
 # =========================
 def detect_country(text):
 
@@ -83,7 +148,7 @@ def detect_country(text):
     if "brazil" in t:
         return "🇧🇷 브라질"
 
-    return "🌍 기타"
+    return ai_detect_country(text)
 
 
 # =========================
@@ -101,7 +166,7 @@ def group_news(news_list):
 
 
 # =========================
-# UI 키보드 생성
+# UI 키보드
 # =========================
 def build_keyboard(grouped):
 
@@ -122,7 +187,7 @@ def build_keyboard(grouped):
 
 
 # =========================
-# 브리핑 실행 (핵심 UX)
+# 브리핑 실행
 # =========================
 def run_country(country, articles):
 
@@ -130,16 +195,13 @@ def run_country(country, articles):
 
     time.sleep(0.5)
 
-    edit_message(msg_id, f"📥 기사 {len(articles)}개 확인 완료")
+    edit_message(msg_id, f"📥 기사 {len(articles)}개 분석 완료")
 
     result = f"📊 <b>{country} 방산 브리핑</b>\n\n"
 
     for i, a in enumerate(articles):
 
-        edit_message(
-            msg_id,
-            f"⏳ 요약 진행 중...\n{i+1}/{len(articles)}"
-        )
+        edit_message(msg_id, f"⏳ 요약 진행 중...\n{i+1}/{len(articles)}")
 
         try:
             summary = summarize(a["title"] + " " + a["summary"])
@@ -163,7 +225,7 @@ def run_country(country, articles):
 
 
 # =========================
-# callback 처리
+# callback 처리 (핵심)
 # =========================
 def handle_callback(data):
 
@@ -173,18 +235,23 @@ def handle_callback(data):
 
     if data.startswith("RUN|"):
 
-        country = data.split("|")[1]
+        country = data.split("|")[1].strip()
 
         news = collect_news()
         grouped = group_news(news)
 
         articles = grouped.get(country, [])
 
+        # 🔥 기타 국가 fallback
+        if len(articles) == 0:
+            send_message(f"⚠️ {country} 데이터 부족 → 전체 뉴스 일부 표시")
+            articles = news[:5]
+
         run_country(country, articles)
 
 
 # =========================
-# Telegram polling (핵심)
+# polling (옵션 B 핵심)
 # =========================
 def listen_callbacks():
 
@@ -205,9 +272,7 @@ def listen_callbacks():
                 last_update_id = update["update_id"]
 
                 if "callback_query" in update:
-
                     data = update["callback_query"]["data"]
-
                     handle_callback(data)
 
         except Exception as e:
@@ -217,7 +282,7 @@ def listen_callbacks():
 
 
 # =========================
-# MAIN 실행
+# MAIN
 # =========================
 def main():
 

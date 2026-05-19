@@ -6,9 +6,6 @@ from collector import collect_news
 from summarizer import summarize
 
 
-# =========================
-# ENV
-# =========================
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
@@ -16,11 +13,11 @@ BASE = f"https://api.telegram.org/bot{TOKEN}"
 
 
 # =========================
-# TELEGRAM SEND
+# SEND MESSAGE
 # =========================
 def send_message(text):
 
-    requests.post(
+    res = requests.post(
         BASE + "/sendMessage",
         json={
             "chat_id": CHAT_ID,
@@ -29,6 +26,8 @@ def send_message(text):
             "disable_web_page_preview": True
         }
     )
+
+    print("TELEGRAM:", res.status_code)
 
 
 # =========================
@@ -39,7 +38,7 @@ def get_date():
 
 
 # =========================
-# COUNTRY DETECT (제외 국가 반영)
+# COUNTRY DETECT
 # =========================
 def detect_country(text):
 
@@ -71,34 +70,16 @@ def detect_country(text):
 
 
 # =========================
-# GROUP INIT (0건 보장)
+# GROUP
 # =========================
 def group_news(news):
 
-    grouped = {
-        "🇯🇵 일본": [],
-        "🇵🇭 필리핀": [],
-        "🇮🇩 인도네시아": [],
-        "🇲🇾 말레이시아": [],
-        "🇻🇳 베트남": [],
-        "🇹🇭 태국": [],
-        "🇧🇩 방글라데시": [],
-        "🇮🇳 인도": [],
-
-        "🇵🇪 페루": [],
-        "🇨🇱 칠레": [],
-        "🇨🇴 콜롬비아": [],
-        "🇦🇷 아르헨티나": [],
-        "🇲🇽 멕시코": [],
-        "🇧🇷 브라질": [],
-
-        "🌍 기타 국가": []
-    }
+    grouped = {}
 
     for n in news:
 
-        title = n.get("title", "")
-        summary = n.get("summary", "")
+        title = n.get("title","")
+        summary = n.get("summary","")
 
         country = detect_country(title + summary)
 
@@ -123,49 +104,36 @@ def build_count_message(grouped):
 
 
 # =========================
-# SUMMARY MESSAGE (날짜 + 발행일 포함)
+# COUNTRY SUMMARY MESSAGE (핵심 변경)
 # =========================
-def build_summary_message(grouped):
+def build_country_message(country, articles):
 
-    msg = "📡 <b>방산 브리핑 리포트</b>\n"
+    msg = f"━━━━━━━━━━━━━━━\n"
+    msg += f"🇺🇳 <b>{country}</b>\n\n"
 
-    for country, articles in grouped.items():
+    for a in articles[:5]:
 
-        if not articles:
+        title = a.get("title","")
+        summary_raw = a.get("summary","")
+        link = a.get("link","")
+
+        published = a.get("published") or a.get("date") or a.get("pubDate") or ""
+
+        if published:
+            published = str(published)[:10]
+            title_line = f"{title} ({published})"
+        else:
+            title_line = title
+
+        if not title or not summary_raw:
             continue
 
-        msg += f"\n━━━━━━━━━━━━━━━\n"
-        msg += f"🇺🇳 <b>{country}</b>\n"
+        try:
+            summary = summarize(title + " " + summary_raw)
+        except:
+            summary = "요약 실패"
 
-        for a in articles[:5]:
-
-            title = a.get("title", "")
-            summary_raw = a.get("summary", "")
-            link = a.get("link", "")
-
-            # 🔥 발행일 통합 처리
-            published = (
-                a.get("published")
-                or a.get("date")
-                or a.get("pubDate")
-                or ""
-            )
-
-            if published:
-                published = str(published)[:10]
-                title_line = f"{title} ({published})"
-            else:
-                title_line = f"{title} (No date)"
-
-            if not title or not summary_raw:
-                continue
-
-            try:
-                summary = summarize(title + " " + summary_raw)
-            except:
-                summary = "요약 실패"
-
-            msg += f"""
+        msg += f"""
 📰 <b>{title_line}</b>
 
 📌 <b>요약</b>
@@ -175,8 +143,6 @@ def build_summary_message(grouped):
 
 ────────────────
 """
-
-        msg += "\n"
 
     return msg
 
@@ -189,16 +155,19 @@ def main():
     print("🚀 뉴스 수집 시작")
 
     news = collect_news()
-
     grouped = group_news(news)
 
-    # 🔥 모든 요약 완료 후 메시지 생성
-    count_msg = build_count_message(grouped)
-    summary_msg = build_summary_message(grouped)
+    # 1️⃣ 카운트 메시지
+    send_message(build_count_message(grouped))
 
-    # 🔥 순차 전송
-    send_message(count_msg)
-    send_message(summary_msg)
+    # 2️⃣ 나라별 개별 메시지 (핵심)
+    for country, articles in grouped.items():
+
+        if not articles:
+            continue
+
+        msg = build_country_message(country, articles)
+        send_message(msg)
 
     print("✅ 완료")
 

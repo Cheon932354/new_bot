@@ -6,16 +6,13 @@ from collector import collect_news
 from summarizer import summarize
 
 
-# =========================
-# TELEGRAM 기본 설정
-# =========================
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
+BASE = f"https://api.telegram.org/bot{TOKEN}"
 
 
 # =========================
-# 메시지 전송
+# 기본 메시지 전송
 # =========================
 def send_message(text, reply_markup=None):
 
@@ -28,11 +25,14 @@ def send_message(text, reply_markup=None):
     if reply_markup:
         data["reply_markup"] = reply_markup
 
-    requests.post(BASE_URL + "/sendMessage", json=data)
+    r = requests.post(BASE + "/sendMessage", json=data)
+
+    # ⭐ message_id 반환 (핵심)
+    return r.json()["result"]["message_id"]
 
 
 # =========================
-# 메시지 수정 (진행상황 표시)
+# 메시지 수정 (진행상황)
 # =========================
 def edit_message(message_id, text):
 
@@ -42,7 +42,7 @@ def edit_message(message_id, text):
         "text": text
     }
 
-    requests.post(BASE_URL + "/editMessageText", json=data)
+    requests.post(BASE + "/editMessageText", json=data)
 
 
 # =========================
@@ -52,11 +52,10 @@ def detect_country(text):
 
     t = text.lower()
 
-    # ===== ASIA =====
-    if "philippines" in t:
-        return "🇵🇭 필리핀"
     if "japan" in t:
         return "🇯🇵 일본"
+    if "philippines" in t:
+        return "🇵🇭 필리핀"
     if "indonesia" in t:
         return "🇮🇩 인도네시아"
     if "malaysia" in t:
@@ -68,7 +67,6 @@ def detect_country(text):
     if "bangladesh" in t:
         return "🇧🇩 방글라데시"
 
-    # ===== LATAM =====
     if "peru" in t:
         return "🇵🇪 페루"
     if "chile" in t:
@@ -105,63 +103,25 @@ def group_news(news_list):
 
 
 # =========================
-# 버튼 UI 생성
+# 국가 브리핑 실행 (핵심)
 # =========================
-def build_keyboard(grouped):
+def run_country(country, articles):
 
-    order = [
-        # Asia
-        "🇵🇭 필리핀",
-        "🇯🇵 일본",
-        "🇮🇩 인도네시아",
-        "🇲🇾 말레이시아",
-        "🇻🇳 베트남",
-        "🇹🇭 태국",
-        "🇧🇩 방글라데시",
+    # 1️⃣ 초기 메시지
+    msg_id = send_message(f"📡 {country} 뉴스 수집 중...")
 
-        # LATAM
-        "🇵🇪 페루",
-        "🇨🇱 칠레",
-        "🇨🇴 콜롬비아",
-        "🇦🇷 아르헨티나",
-        "🇲🇽 멕시코",
-        "🇧🇷 브라질",
-
-        "🌍 기타"
-    ]
-
-    keyboard = []
-
-    for c in order:
-
-        if c in grouped:
-            count = len(grouped[c])
-
-            keyboard.append([{
-                "text": f"{c} ({count})",
-                "callback_data": c
-            }])
-
-    keyboard.append([{
-        "text": "❌ 종료",
-        "callback_data": "exit"
-    }])
-
-    return json.dumps({"inline_keyboard": keyboard})
-
-
-# =========================
-# 국가 브리핑 실행
-# =========================
-def run_country(country, articles, message_id):
-
-    edit_message(message_id, f"📡 {country} 요약 중... ({len(articles)}개)")
+    # 2️⃣ 실제 진행 상태 업데이트
+    edit_message(msg_id, f"📥 {country} 기사 {len(articles)}개 확인 완료")
 
     result = f"📊 <b>{country} 방산 브리핑</b>\n\n"
 
+    # 3️⃣ 요약 진행
     for i, a in enumerate(articles):
 
-        edit_message(message_id, f"⏳ 진행중... {i+1}/{len(articles)}")
+        edit_message(
+            msg_id,
+            f"⏳ 요약 진행 중...\n{i+1}/{len(articles)}"
+        )
 
         summary = summarize(a["title"] + " " + a["summary"])
 
@@ -174,14 +134,17 @@ def run_country(country, articles, message_id):
 ------------------
 """
 
+    # 4️⃣ 완료 상태
+    edit_message(msg_id, "✅ 요약 완료! 보고서 생성 중...")
+
     send_message(result)
 
-    # 다음 선택 UI
+    # 5️⃣ 다음 선택 UI
     send_message(
-        "다음 선택:",
+        "➡ 다음 선택",
         reply_markup=json.dumps({
             "inline_keyboard": [
-                [{"text": "🌍 다시 선택", "callback_data": "menu"}],
+                [{"text": "🌍 다른 국가 선택", "callback_data": "menu"}],
                 [{"text": "❌ 종료", "callback_data": "exit"}]
             ]
         })
@@ -189,32 +152,30 @@ def run_country(country, articles, message_id):
 
 
 # =========================
-# MAIN 실행
+# MAIN
 # =========================
 def main():
 
-    print("🚀 Starting Defense Briefing Bot")
-
     news = collect_news()
-
-    if not news:
-        print("❌ 뉴스 없음")
-        return
 
     grouped = group_news(news)
 
-    keyboard = build_keyboard(grouped)
+    keyboard = []
 
-    # 첫 메시지
+    for k, v in grouped.items():
+        keyboard.append([{
+            "text": f"{k} ({len(v)})",
+            "callback_data": k
+        }])
+
+    keyboard.append([{"text": "❌ 종료", "callback_data": "exit"}])
+
     send_message(
-        "🌍 국가를 선택하세요:",
-        reply_markup=keyboard
+        "🌍 국가를 선택하세요",
+        reply_markup=json.dumps({"inline_keyboard": keyboard})
     )
 
-    print("✅ UI 전송 완료")
-
-    # ⚠️ 여기까지가 “1차 실행”
-    # callback 처리까지 하려면 webhook 필요
+    print("UI sent")
 
 
 if __name__ == "__main__":

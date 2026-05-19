@@ -12,8 +12,6 @@ BASE = f"https://api.telegram.org/bot{TOKEN}"
 
 
 # =========================
-# 기본 메시지 전송
-# =========================
 def send_message(text, reply_markup=None):
 
     data = {
@@ -27,26 +25,9 @@ def send_message(text, reply_markup=None):
 
     r = requests.post(BASE + "/sendMessage", json=data)
 
-    # ⭐ message_id 반환 (핵심)
     return r.json()["result"]["message_id"]
 
 
-# =========================
-# 메시지 수정 (진행상황)
-# =========================
-def edit_message(message_id, text):
-
-    data = {
-        "chat_id": CHAT_ID,
-        "message_id": message_id,
-        "text": text
-    }
-
-    requests.post(BASE + "/editMessageText", json=data)
-
-
-# =========================
-# 국가 분류
 # =========================
 def detect_country(text):
 
@@ -71,12 +52,6 @@ def detect_country(text):
         return "🇵🇪 페루"
     if "chile" in t:
         return "🇨🇱 칠레"
-    if "colombia" in t:
-        return "🇨🇴 콜롬비아"
-    if "argentina" in t:
-        return "🇦🇷 아르헨티나"
-    if "mexico" in t:
-        return "🇲🇽 멕시코"
     if "brazil" in t:
         return "🇧🇷 브라질"
 
@@ -84,99 +59,90 @@ def detect_country(text):
 
 
 # =========================
-# 뉴스 그룹핑
-# =========================
-def group_news(news_list):
+def group(news):
 
     grouped = {}
 
-    for n in news_list:
-
-        country = detect_country(n["title"] + n["summary"])
-
-        if country not in grouped:
-            grouped[country] = []
-
-        grouped[country].append(n)
+    for n in news:
+        c = detect_country(n["title"] + n["summary"])
+        grouped.setdefault(c, []).append(n)
 
     return grouped
 
 
 # =========================
-# 국가 브리핑 실행 (핵심)
-# =========================
-def run_country(country, articles):
-
-    # 1️⃣ 초기 메시지
-    msg_id = send_message(f"📡 {country} 뉴스 수집 중...")
-
-    # 2️⃣ 실제 진행 상태 업데이트
-    edit_message(msg_id, f"📥 {country} 기사 {len(articles)}개 확인 완료")
-
-    result = f"📊 <b>{country} 방산 브리핑</b>\n\n"
-
-    # 3️⃣ 요약 진행
-    for i, a in enumerate(articles):
-
-        edit_message(
-            msg_id,
-            f"⏳ 요약 진행 중...\n{i+1}/{len(articles)}"
-        )
-
-        summary = summarize(a["title"] + " " + a["summary"])
-
-        result += f"""
-📰 {a['title']}
-
-{summary}
-
-🔗 {a['link']}
-------------------
-"""
-
-    # 4️⃣ 완료 상태
-    edit_message(msg_id, "✅ 요약 완료! 보고서 생성 중...")
-
-    send_message(result)
-
-    # 5️⃣ 다음 선택 UI
-    send_message(
-        "➡ 다음 선택",
-        reply_markup=json.dumps({
-            "inline_keyboard": [
-                [{"text": "🌍 다른 국가 선택", "callback_data": "menu"}],
-                [{"text": "❌ 종료", "callback_data": "exit"}]
-            ]
-        })
-    )
-
-
-# =========================
-# MAIN
-# =========================
-def main():
-
-    news = collect_news()
-
-    grouped = group_news(news)
+def build_keyboard(grouped):
 
     keyboard = []
 
     for k, v in grouped.items():
         keyboard.append([{
             "text": f"{k} ({len(v)})",
-            "callback_data": k
+            "callback_data": f"RUN|{k}"
         }])
 
-    keyboard.append([{"text": "❌ 종료", "callback_data": "exit"}])
+    keyboard.append([{
+        "text": "❌ 종료",
+        "callback_data": "EXIT"
+    }])
+
+    return json.dumps({"inline_keyboard": keyboard})
+
+
+# =========================
+def main():
+
+    news = collect_news()
+    grouped = group(news)
+
+    keyboard = build_keyboard(grouped)
 
     send_message(
         "🌍 국가를 선택하세요",
-        reply_markup=json.dumps({"inline_keyboard": keyboard})
+        reply_markup=keyboard
     )
 
     print("UI sent")
 
 
+# =========================
+# callback 처리 (핵심 추가)
+# =========================
+def handle_callback(data):
+
+    if data == "EXIT":
+        send_message("종료되었습니다.")
+        return
+
+    if data.startswith("RUN|"):
+
+        country = data.split("|")[1]
+
+        news = collect_news()
+        grouped = group(news)
+
+        articles = grouped.get(country, [])
+
+        msg_id = send_message(f"📡 {country} 요약 시작...")
+
+        result = f"📊 {country} 브리핑\n\n"
+
+        for i, a in enumerate(articles):
+
+            result += f"""
+📰 {a['title']}
+
+{summarize(a['title'] + a['summary'])}
+
+🔗 {a['link']}
+------------------
+"""
+
+        send_message(result)
+
+        send_message("➡ 다시 실행하려면 GitHub Actions 재실행")
+
+
+# =========================
 if __name__ == "__main__":
     main()

@@ -32,7 +32,14 @@ def send_message(text):
 
 
 # =========================
-# 국가 분류
+# DATE
+# =========================
+def get_date():
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+# =========================
+# COUNTRY DETECT (제외 국가 반영)
 # =========================
 def detect_country(text):
 
@@ -63,16 +70,33 @@ def detect_country(text):
 
 
 # =========================
-# 그룹핑
+# GROUP INIT (0건 보장)
 # =========================
 def group_news(news):
 
-    grouped = {}
+    grouped = {
+        "🇯🇵 일본": [],
+        "🇵🇭 필리핀": [],
+        "🇮🇩 인도네시아": [],
+        "🇲🇾 말레이시아": [],
+        "🇻🇳 베트남": [],
+        "🇹🇭 태국": [],
+        "🇧🇩 방글라데시": [],
+
+        "🇵🇪 페루": [],
+        "🇨🇱 칠레": [],
+        "🇨🇴 콜롬비아": [],
+        "🇦🇷 아르헨티나": [],
+        "🇲🇽 멕시코": [],
+        "🇧🇷 브라질": [],
+
+        "🌍 기타 국가": []
+    }
 
     for n in news:
 
-        title = n.get("title", "")
-        summary = n.get("summary", "")
+        title = n.get("title","")
+        summary = n.get("summary","")
 
         country = detect_country(title + summary)
 
@@ -86,7 +110,9 @@ def group_news(news):
 # =========================
 def send_count(grouped):
 
-    msg = "📊 <b>오늘 방산 뉴스 업데이트</b>\n\n"
+    date = get_date()
+
+    msg = f"📊 <b>방산 뉴스 업데이트 ({date})</b>\n\n"
 
     for country, articles in grouped.items():
         msg += f"{country} : {len(articles)}건\n"
@@ -111,9 +137,17 @@ def send_summary(grouped):
 
         for a in articles[:5]:
 
-            title = a.get("title", "")
-            summary_raw = a.get("summary", "")
-            link = a.get("link", "")
+            title = a.get("title","")
+            summary_raw = a.get("summary","")
+            link = a.get("link","")
+
+            # 날짜 처리 (있으면 표시)
+            published = a.get("date") or a.get("published") or ""
+
+            if published:
+                title_line = f"{title} ({published})"
+            else:
+                title_line = title
 
             if not title or not summary_raw:
                 continue
@@ -124,7 +158,7 @@ def send_summary(grouped):
                 summary = "요약 실패"
 
             msg += f"""
-📰 <b>{title}</b>
+📰 <b>{title_line}</b>
 
 📌 <b>요약</b>
 {summary}
@@ -140,7 +174,7 @@ def send_summary(grouped):
 
 
 # =========================
-# MAIN JOB (GitHub Actions 실행용)
+# MAIN
 # =========================
 def main():
 
@@ -150,19 +184,11 @@ def main():
 
     grouped = group_news(news)
 
-    # =========================
-    # 1️⃣ 국가별 카운트
-    # =========================
     send_count(grouped)
-
-    # =========================
-    # 2️⃣ 카드형 요약
-    # =========================
     send_summary(grouped)
 
-    print("✅ 브리핑 완료")
+    print("✅ 완료")
 
 
-# =========================
 if __name__ == "__main__":
     main()

@@ -12,13 +12,42 @@ from summarizer import summarize
 # =========================
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 BASE = f"https://api.telegram.org/bot{TOKEN}"
 
 
 # =========================
-# TELEGRAM
+# 상태 관리 (핵심)
+# =========================
+processed_update_ids = set()
+processing = False
+
+
+# =========================
+# 국가 고정 리스트 (핵심)
+# =========================
+COUNTRIES = [
+    "🇯🇵 일본",
+    "🇵🇭 필리핀",
+    "🇮🇩 인도네시아",
+    "🇲🇾 말레이시아",
+    "🇻🇳 베트남",
+    "🇹🇭 태국",
+    "🇧🇩 방글라데시",
+
+    "🇵🇪 페루",
+    "🇨🇱 칠레",
+    "🇨🇴 콜롬비아",
+    "🇦🇷 아르헨티나",
+    "🇲🇽 멕시코",
+    "🇧🇷 브라질",
+
+    "🌍 기타 국가"
+]
+
+
+# =========================
+# Telegram
 # =========================
 def send_message(text, reply_markup=None):
 
@@ -48,13 +77,12 @@ def edit_message(message_id, text):
 
 
 # =========================
-# 국가 감지 (AI + rule)
+# 국가 감지 (기존 + fallback)
 # =========================
 def detect_country(text):
 
     t = text.lower()
 
-    # 1차 rule
     if "japan" in t:
         return "🇯🇵 일본"
     if "philippines" in t:
@@ -83,12 +111,11 @@ def detect_country(text):
     if "brazil" in t:
         return "🇧🇷 브라질"
 
-    # fallback
     return "🌍 기타 국가"
 
 
 # =========================
-# 그룹핑
+# 뉴스 그룹핑
 # =========================
 def group_news(news_list):
 
@@ -107,17 +134,19 @@ def group_news(news_list):
 
 
 # =========================
-# 키보드
+# UI (고정 국가 버튼)
 # =========================
 def build_keyboard(grouped):
 
     keyboard = []
 
-    for k, v in grouped.items():
+    for c in COUNTRIES:
+
+        count = len(grouped.get(c, []))
 
         keyboard.append([{
-            "text": f"{k} ({len(v)})",
-            "callback_data": f"RUN|{k}"
+            "text": f"{c} ({count})",
+            "callback_data": f"RUN|{c}"
         }])
 
     keyboard.append([{
@@ -129,7 +158,7 @@ def build_keyboard(grouped):
 
 
 # =========================
-# 🔥 핵심: 안전한 브리핑 실행
+# 브리핑 실행 (중복 방지 핵심)
 # =========================
 def run_country(country, articles):
 
@@ -149,7 +178,6 @@ def run_country(country, articles):
         summary_raw = a.get("summary", "")
         link = a.get("link", "")
 
-        # 🔥 완전 방어
         if not title or not summary_raw:
             continue
 
@@ -157,8 +185,8 @@ def run_country(country, articles):
 
         try:
             summary = summarize(title + " " + summary_raw)
-        except Exception as e:
-            summary = f"❌ 요약 실패"
+        except:
+            summary = "❌ 요약 실패"
 
         if not summary:
             summary = "요약 결과 없음"
@@ -177,43 +205,54 @@ def run_country(country, articles):
 
     edit_message(msg_id, "✅ 요약 완료!")
 
-    # 🔥 핵심: 기타 포함 모든 케이스 보장
     if valid_count == 0:
-        result += "\n⚠️ 표시할 뉴스가 부족하여 기본 데이터를 출력합니다."
+        result += "\n⚠️ 표시할 뉴스가 없습니다."
 
     send_message(result)
 
 
 # =========================
-# callback 처리
+# callback 처리 (중복 방지 핵심)
 # =========================
 def handle_callback(data, news, grouped):
 
-    if data == "EXIT":
-        send_message("❌ 종료되었습니다.")
+    global processing
+
+    if processing:
         return
 
-    if data.startswith("RUN|"):
+    processing = True
 
-        country = data.split("|")[1].strip()
+    try:
 
-        articles = grouped.get(country, [])
+        if data == "EXIT":
+            send_message("❌ 종료되었습니다.")
+            return
 
-        # 🔥 기타 국가 100% 보장 fallback
-        if not articles or len(articles) == 0:
+        if data.startswith("RUN|"):
 
-            send_message(f"⚠️ {country} 데이터 부족 → 전체 뉴스 기반으로 재구성")
+            country = data.split("|")[1].strip()
 
-            articles = [
-                n for n in news[:10]
-                if n.get("title") and n.get("summary")
-            ]
+            articles = grouped.get(country, [])
 
-        run_country(country, articles)
+            # 🔥 fallback (기타 포함 100% 보장)
+            if not articles:
+
+                send_message(f"⚠️ {country} 데이터 부족 → 전체 뉴스 사용")
+
+                articles = [
+                    n for n in news[:10]
+                    if n.get("title") and n.get("summary")
+                ]
+
+            run_country(country, articles)
+
+    finally:
+        processing = False
 
 
 # =========================
-# polling
+# polling (중복 방지)
 # =========================
 def listen_callbacks(news, grouped):
 
@@ -221,17 +260,19 @@ def listen_callbacks(news, grouped):
 
     while True:
 
-        url = f"{BASE}/getUpdates"
-
-        if last_update_id:
-            url += f"?offset={last_update_id + 1}"
-
         try:
-            res = requests.get(url).json()
+            res = requests.get(f"{BASE}/getUpdates").json()
 
             for update in res.get("result", []):
 
-                last_update_id = update["update_id"]
+                uid = update["update_id"]
+
+                # 🔥 중복 방지 핵심
+                if uid in processed_update_ids:
+                    continue
+
+                processed_update_ids.add(uid)
+                last_update_id = uid
 
                 if "callback_query" in update:
 

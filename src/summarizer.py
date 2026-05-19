@@ -8,33 +8,47 @@ client = OpenAI(
 
 def summarize(article):
 
-    prompt = f"""
-다음 해외 방산 뉴스를:
+    try:
 
-1. 한국어로 번역
-2. 3줄로 요약
-3. 중요도를 1~5로 평가
-4. 관련 국가/군종/기업 태그 생성
+        article = article[:1000]
 
-형식:
-
-[제목]
-[요약]
-[중요도]
-[태그]
+        prompt = f"""
+아래 방산뉴스 제목을 한국어 한줄로 짧게 요약해줘.
 
 기사:
 {article}
 """
 
-    response = client.chat.completions.create(
-        model="meta-llama/llama-3-8b-instruct:free",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
+        response = client.chat.completions.create(
 
-    return response.choices[0].message.content
+            model="mistralai/mistral-7b-instruct:free",
+
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+
+            max_tokens=60
+        )
+
+        result = (
+            response
+            .choices[0]
+            .message
+            .content
+            .strip()
+        )
+
+        if len(result) < 3:
+            return article[:80]
+
+        return result
+
+    except Exception as e:
+
+        print("요약 오류:")
+        print(e)
+
+        return article[:80]

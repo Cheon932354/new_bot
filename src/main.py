@@ -30,31 +30,11 @@ def group_news_by_country(news):
 
     grouped = {}
 
-    country_map = {
-        "Brazil": "브라질",
-        "Chile": "칠레",
-        "Peru": "페루",
-        "Ecuador": "에콰도르",
-        "Colombia": "콜롬비아",
-        "Argentina": "아르헨티나",
-        "Vietnam": "베트남",
-        "Thailand": "태국",
-        "Philippines": "필리핀",
-        "Indonesia": "인도네시아",
-        "India": "인도"
-    }
-
     for article in news:
 
-        text = (
-            article["title"] + " " + article["summary"]
-        ).lower()
+        country = article["country"]
 
-        for eng, kor in country_map.items():
-
-            if eng.lower() in text:
-
-                grouped.setdefault(kor, []).append(article)
+        grouped.setdefault(country, []).append(article)
 
     return grouped
 
@@ -104,13 +84,15 @@ def button_callback(update, context):
     for article in articles[:5]:
 
         summarized = summarize(
-            article["title"]
+            article["title"] + "\n" + article["summary"]
         )
+
+        short_summary = summarized[:120]
 
         message += f"""
 📰 {article['title']}
 
-→ {summarized[:100]}
+→ {short_summary}
 
 🔗 {article['link']}
 
@@ -131,7 +113,11 @@ def main():
 
     summary_message = "📡 해외 방산 브리핑\n\n"
 
-    summary_message += "🌏 아시아 / 🌎 중남미 뉴스 현황\n\n"
+    summary_message += (
+        "🌏 아시아 / 🌎 중남미 뉴스 현황\n\n"
+    )
+
+    total_articles = 0
 
     for country, articles in news_cache.items():
 
@@ -140,6 +126,12 @@ def main():
         summary_message += (
             f"{flag} {country} : {len(articles)}건\n"
         )
+
+        total_articles += len(articles)
+
+    summary_message += (
+        f"\n📰 최근 7일 수집 기사 수: {total_articles}건"
+    )
 
     bot.send_message(
         chat_id=CHAT_ID,
@@ -159,6 +151,7 @@ def main():
     )
 
     updater.start_polling()
+
     updater.idle()
 
 if __name__ == "__main__":

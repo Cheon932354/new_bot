@@ -37,89 +37,24 @@ def send_message(text, reply_markup=None):
 
 def edit_message(message_id, text):
 
-    data = {
-        "chat_id": CHAT_ID,
-        "message_id": message_id,
-        "text": text
-    }
-
-    requests.post(BASE + "/editMessageText", json=data)
-
-
-# =========================
-# AI 국가 분류
-# =========================
-def ai_detect_country(text):
-
-    if not OPENROUTER_API_KEY:
-        return "🌍 기타 국가"
-
-    try:
-        res = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "openai/gpt-4o-mini",
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "Return ONLY a country name like Japan, Brazil, India, Philippines. If unclear return Other."
-                    },
-                    {
-                        "role": "user",
-                        "content": text[:1000]
-                    }
-                ],
-                "temperature": 0.2
-            },
-            timeout=10
-        )
-
-        result = res.json()["choices"][0]["message"]["content"].strip()
-
-        return normalize_country(result)
-
-    except:
-        return "🌍 기타 국가"
+    requests.post(
+        BASE + "/editMessageText",
+        json={
+            "chat_id": CHAT_ID,
+            "message_id": message_id,
+            "text": text
+        }
+    )
 
 
 # =========================
-# 국가 정규화
-# =========================
-def normalize_country(name):
-
-    name = name.lower()
-
-    mapping = {
-        "japan": "🇯🇵 일본",
-        "philippines": "🇵🇭 필리핀",
-        "indonesia": "🇮🇩 인도네시아",
-        "malaysia": "🇲🇾 말레이시아",
-        "vietnam": "🇻🇳 베트남",
-        "thailand": "🇹🇭 태국",
-        "bangladesh": "🇧🇩 방글라데시",
-
-        "peru": "🇵🇪 페루",
-        "chile": "🇨🇱 칠레",
-        "colombia": "🇨🇴 콜롬비아",
-        "argentina": "🇦🇷 아르헨티나",
-        "mexico": "🇲🇽 멕시코",
-        "brazil": "🇧🇷 브라질"
-    }
-
-    return mapping.get(name, "🌍 기타 국가")
-
-
-# =========================
-# 하이브리드 국가 감지
+# 국가 감지 (AI + rule)
 # =========================
 def detect_country(text):
 
     t = text.lower()
 
+    # 1차 rule
     if "japan" in t:
         return "🇯🇵 일본"
     if "philippines" in t:
@@ -148,31 +83,38 @@ def detect_country(text):
     if "brazil" in t:
         return "🇧🇷 브라질"
 
-    return ai_detect_country(text)
+    # fallback
+    return "🌍 기타 국가"
 
 
 # =========================
-# 뉴스 그룹핑
+# 그룹핑
 # =========================
 def group_news(news_list):
 
     grouped = {}
 
     for n in news_list:
-        c = detect_country(n["title"] + n["summary"])
-        grouped.setdefault(c, []).append(n)
+
+        title = n.get("title") or ""
+        summary = n.get("summary") or ""
+
+        country = detect_country(title + summary)
+
+        grouped.setdefault(country, []).append(n)
 
     return grouped
 
 
 # =========================
-# UI 키보드
+# 키보드
 # =========================
 def build_keyboard(grouped):
 
     keyboard = []
 
     for k, v in grouped.items():
+
         keyboard.append([{
             "text": f"{k} ({len(v)})",
             "callback_data": f"RUN|{k}"
@@ -187,7 +129,7 @@ def build_keyboard(grouped):
 
 
 # =========================
-# 브리핑 실행
+# 🔥 핵심: 안전한 브리핑 실행
 # =========================
 def run_country(country, articles):
 
@@ -195,39 +137,57 @@ def run_country(country, articles):
 
     time.sleep(0.5)
 
-    edit_message(msg_id, f"📥 기사 {len(articles)}개 분석 완료")
+    edit_message(msg_id, f"📥 기사 {len(articles)}개 분석 시작")
 
     result = f"📊 <b>{country} 방산 브리핑</b>\n\n"
 
+    valid_count = 0
+
     for i, a in enumerate(articles):
+
+        title = a.get("title", "")
+        summary_raw = a.get("summary", "")
+        link = a.get("link", "")
+
+        # 🔥 완전 방어
+        if not title or not summary_raw:
+            continue
 
         edit_message(msg_id, f"⏳ 요약 진행 중...\n{i+1}/{len(articles)}")
 
         try:
-            summary = summarize(a["title"] + " " + a["summary"])
+            summary = summarize(title + " " + summary_raw)
         except Exception as e:
-            summary = f"❌ 요약 실패: {e}"
+            summary = f"❌ 요약 실패"
+
+        if not summary:
+            summary = "요약 결과 없음"
 
         result += f"""
-📰 {a['title']}
+📰 {title}
 
 {summary}
 
-🔗 {a['link']}
+🔗 {link}
 -----------------------
 """
 
+        valid_count += 1
         time.sleep(0.8)
 
     edit_message(msg_id, "✅ 요약 완료!")
+
+    # 🔥 핵심: 기타 포함 모든 케이스 보장
+    if valid_count == 0:
+        result += "\n⚠️ 표시할 뉴스가 부족하여 기본 데이터를 출력합니다."
 
     send_message(result)
 
 
 # =========================
-# callback 처리 (핵심)
+# callback 처리
 # =========================
-def handle_callback(data):
+def handle_callback(data, news, grouped):
 
     if data == "EXIT":
         send_message("❌ 종료되었습니다.")
@@ -237,23 +197,25 @@ def handle_callback(data):
 
         country = data.split("|")[1].strip()
 
-        news = collect_news()
-        grouped = group_news(news)
-
         articles = grouped.get(country, [])
 
-        # 🔥 기타 국가 fallback
-        if len(articles) == 0:
-            send_message(f"⚠️ {country} 데이터 부족 → 전체 뉴스 일부 표시")
-            articles = news[:5]
+        # 🔥 기타 국가 100% 보장 fallback
+        if not articles or len(articles) == 0:
+
+            send_message(f"⚠️ {country} 데이터 부족 → 전체 뉴스 기반으로 재구성")
+
+            articles = [
+                n for n in news[:10]
+                if n.get("title") and n.get("summary")
+            ]
 
         run_country(country, articles)
 
 
 # =========================
-# polling (옵션 B 핵심)
+# polling
 # =========================
-def listen_callbacks():
+def listen_callbacks(news, grouped):
 
     last_update_id = None
 
@@ -272,8 +234,10 @@ def listen_callbacks():
                 last_update_id = update["update_id"]
 
                 if "callback_query" in update:
+
                     data = update["callback_query"]["data"]
-                    handle_callback(data)
+
+                    handle_callback(data, news, grouped)
 
         except Exception as e:
             print("polling error:", e)
@@ -287,6 +251,7 @@ def listen_callbacks():
 def main():
 
     news = collect_news()
+
     grouped = group_news(news)
 
     keyboard = build_keyboard(grouped)
@@ -298,7 +263,7 @@ def main():
 
     print("UI sent")
 
-    listen_callbacks()
+    listen_callbacks(news, grouped)
 
 
 # =========================

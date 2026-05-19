@@ -17,14 +17,13 @@ BASE = f"https://api.telegram.org/bot{TOKEN}"
 
 
 # =========================
-# 상태 관리 (중복 방지)
+# 상태 관리 (중복 방지 핵심)
 # =========================
-processed_update_ids = set()
-processing = False
+processed_callback_ids = set()
 
 
 # =========================
-# 그룹 구조 (UI 핵심)
+# 국가 그룹
 # =========================
 ASIA_COUNTRIES = [
     "🇯🇵 일본",
@@ -46,9 +45,6 @@ LATAM_COUNTRIES = [
 ]
 
 OTHER_COUNTRY = ["🌍 기타 국가"]
-
-
-ALL_COUNTRIES = ASIA_COUNTRIES + LATAM_COUNTRIES + OTHER_COUNTRY
 
 
 # =========================
@@ -82,39 +78,32 @@ def edit_message(message_id, text):
 
 
 # =========================
-# 국가 분류
+# 국가 감지
 # =========================
 def detect_country(text):
 
     t = (text or "").lower()
 
-    if "japan" in t:
-        return "🇯🇵 일본"
-    if "philippines" in t:
-        return "🇵🇭 필리핀"
-    if "indonesia" in t:
-        return "🇮🇩 인도네시아"
-    if "malaysia" in t:
-        return "🇲🇾 말레이시아"
-    if "vietnam" in t:
-        return "🇻🇳 베트남"
-    if "thailand" in t:
-        return "🇹🇭 태국"
-    if "bangladesh" in t:
-        return "🇧🇩 방글라데시"
+    mapping = {
+        "japan": "🇯🇵 일본",
+        "philippines": "🇵🇭 필리핀",
+        "indonesia": "🇮🇩 인도네시아",
+        "malaysia": "🇲🇾 말레이시아",
+        "vietnam": "🇻🇳 베트남",
+        "thailand": "🇹🇭 태국",
+        "bangladesh": "🇧🇩 방글라데시",
 
-    if "peru" in t:
-        return "🇵🇪 페루"
-    if "chile" in t:
-        return "🇨🇱 칠레"
-    if "colombia" in t:
-        return "🇨🇴 콜롬비아"
-    if "argentina" in t:
-        return "🇦🇷 아르헨티나"
-    if "mexico" in t:
-        return "🇲🇽 멕시코"
-    if "brazil" in t:
-        return "🇧🇷 브라질"
+        "peru": "🇵🇪 페루",
+        "chile": "🇨🇱 칠레",
+        "colombia": "🇨🇴 콜롬비아",
+        "argentina": "🇦🇷 아르헨티나",
+        "mexico": "🇲🇽 멕시코",
+        "brazil": "🇧🇷 브라질"
+    }
+
+    for k, v in mapping.items():
+        if k in t:
+            return v
 
     return "🌍 기타 국가"
 
@@ -139,39 +128,36 @@ def group_news(news_list):
 
 
 # =========================
-# UI (그룹형 버튼)
+# UI (그룹형)
 # =========================
 def build_keyboard(grouped):
 
     keyboard = []
 
-    # 🔵 아시아 그룹
     keyboard.append([{"text": "🌏 아시아", "callback_data": "NONE"}])
 
     for c in ASIA_COUNTRIES:
         count = len(grouped.get(c, []))
         keyboard.append([{
-            "text": f"{c} ({count})",
+            "text": f"{c} ｜ {count} 📰",
             "callback_data": f"RUN|{c}"
         }])
 
-    # 🔴 중남미 그룹
     keyboard.append([{"text": "🌎 중남미", "callback_data": "NONE"}])
 
     for c in LATAM_COUNTRIES:
         count = len(grouped.get(c, []))
         keyboard.append([{
-            "text": f"{c} ({count})",
+            "text": f"{c} ｜ {count} 📰",
             "callback_data": f"RUN|{c}"
         }])
 
-    # ⚪ 기타
     keyboard.append([{"text": "🌍 기타", "callback_data": "NONE"}])
 
     for c in OTHER_COUNTRY:
         count = len(grouped.get(c, []))
         keyboard.append([{
-            "text": f"{c} ({count})",
+            "text": f"{c} ｜ {count} 📰",
             "callback_data": f"RUN|{c}"
         }])
 
@@ -231,58 +217,46 @@ def run_country(country, articles):
 
     edit_message(msg_id, "✅ 요약 완료!")
 
-    # 🔥 핵심: 기타 포함 모든 케이스 출력 보장
+    # 🔥 기타 포함 모든 경우 출력 보장
     if valid == 0:
-        result += "\n⚠️ 표시할 뉴스 없음 (fallback 실행)"
+        result += "\n⚠️ 표시할 뉴스가 없어 fallback 데이터를 사용했습니다."
 
     send_message(result)
 
 
 # =========================
-# callback 처리 (중복 + 기타 버그 해결)
+# callback 처리 (완전 중복 제거)
 # =========================
 def handle_callback(data, news, grouped):
 
-    global processing
-
-    if processing:
+    if data == "EXIT":
+        send_message("❌ 종료")
         return
 
-    processing = True
+    if data == "NONE":
+        return
 
-    try:
+    if data.startswith("RUN|"):
 
-        if data == "EXIT":
-            send_message("❌ 종료")
-            return
+        country = data.split("|")[1].strip()
 
-        if data == "NONE":
-            return
+        articles = grouped.get(country, [])
 
-        if data.startswith("RUN|"):
+        # 🔥 fallback 핵심
+        if not articles or len(articles) == 0:
 
-            country = data.split("|")[1].strip()
+            send_message(f"⚠️ {country} 데이터 부족 → 전체 뉴스 사용")
 
-            articles = grouped.get(country, [])
+            articles = [
+                n for n in news[:10]
+                if n.get("title") and n.get("summary")
+            ]
 
-            # 🔥 기타 국가 fallback (완전 해결 핵심)
-            if not articles or len(articles) == 0:
-
-                send_message(f"⚠️ {country} 데이터 부족 → 전체 뉴스 사용")
-
-                articles = [
-                    n for n in news[:10]
-                    if n.get("title") and n.get("summary")
-                ]
-
-            run_country(country, articles)
-
-    finally:
-        processing = False
+        run_country(country, articles)
 
 
 # =========================
-# polling (중복 실행 제거)
+# polling (완전 중복 방지 핵심)
 # =========================
 def listen_callbacks(news, grouped):
 
@@ -293,16 +267,21 @@ def listen_callbacks(news, grouped):
 
             for update in res.get("result", []):
 
-                uid = update["update_id"]
-
-                if uid in processed_update_ids:
+                if "callback_query" not in update:
                     continue
 
-                processed_update_ids.add(uid)
+                callback = update["callback_query"]
 
-                if "callback_query" in update:
-                    data = update["callback_query"]["data"]
-                    handle_callback(data, news, grouped)
+                cid = callback["id"]  # 🔥 핵심
+
+                if cid in processed_callback_ids:
+                    continue
+
+                processed_callback_ids.add(cid)
+
+                data = callback["data"]
+
+                handle_callback(data, news, grouped)
 
         except Exception as e:
             print("polling error:", e)

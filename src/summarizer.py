@@ -19,14 +19,22 @@ def translate_title(title):
             messages=[
                 {
                     "role": "system",
-                    "content": "Translate the defense news title into natural Korean."
+                    "content": """
+당신은 방산 전문 번역가이다.
+
+규칙:
+- 반드시 자연스러운 한국어로 번역
+- 무기체계 명칭(F-35, Patriot, K9 등)은 유지
+- 언론 기사 스타일로 번역
+- 불필요한 설명 금지
+"""
                 },
                 {
                     "role": "user",
                     "content": title
                 }
             ],
-            max_tokens=100
+            max_tokens=120
         )
 
         return response.choices[0].message.content.strip()
@@ -49,12 +57,18 @@ def summarize(text):
                 {
                     "role": "system",
                     "content": """
-Summarize the defense news in Korean within 3 concise bullet points.
+당신은 한국 방산 전문 브리핑 분석관이다.
 
-IMPORTANT:
-- Do NOT repeat the title
-- Focus only on 핵심 내용
-- Keep it short and professional
+반드시 한국어로만 답변하라.
+
+규칙:
+- 영어 문장을 그대로 사용하지 말 것
+- 무기체계 명칭(F-35, Patriot, K9 등)만 영어 유지 가능
+- 나머지는 자연스러운 한국어로 번역
+- 제목 반복 금지
+- 핵심 내용만 3줄로 요약
+- 각 줄은 "-" 로 시작
+- 간결하고 전문적인 문체 사용
 """
                 },
                 {
@@ -62,7 +76,7 @@ IMPORTANT:
                     "content": text
                 }
             ],
-            max_tokens=200
+            max_tokens=220
         )
 
         return response.choices[0].message.content.strip()

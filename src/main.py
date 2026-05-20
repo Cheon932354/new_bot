@@ -3,7 +3,7 @@ import requests
 from datetime import datetime
 
 from collector import collect_news
-from summarizer import summarize
+from summarizer import summarize, translate_title
 
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -45,6 +45,7 @@ def detect_country(text):
     t = (text or "").lower()
 
     mapping = {
+
         # 아시아
         "japan":"🇯🇵 일본",
         "philippines":"🇵🇭 필리핀",
@@ -55,7 +56,7 @@ def detect_country(text):
         "bangladesh":"🇧🇩 방글라데시",
         "india":"🇮🇳 인도",
 
-        # 중앙아시아 추가
+        # 중앙아시아
         "uzbekistan":"🇺🇿 우즈베키스탄",
         "kazakhstan":"🇰🇿 카자흐스탄",
         "kyrgyzstan":"🇰🇬 키르기스스탄",
@@ -82,6 +83,7 @@ def detect_country(text):
 def group_news(news):
 
     grouped = {
+
         # 아시아
         "🇯🇵 일본": [],
         "🇵🇭 필리핀": [],
@@ -105,6 +107,7 @@ def group_news(news):
         "🇲🇽 멕시코": [],
         "🇧🇷 브라질": [],
 
+        # 기타
         "🌍 기타 국가": []
     }
 
@@ -136,7 +139,7 @@ def build_count_message(grouped):
 
 
 # =========================
-# BUILD COUNTRY MESSAGE
+# COUNTRY MESSAGE
 # =========================
 def build_country_message(country, articles):
 
@@ -156,11 +159,12 @@ def build_country_message(country, articles):
             or ""
         )
 
+        # 날짜 있으면만 표시
         if published:
             published = str(published)[:10]
             title_line = f"{title} ({published})"
         else:
-            title_line = f"{title} (No date)"
+            title_line = title
 
         if not title:
             continue
@@ -168,16 +172,32 @@ def build_country_message(country, articles):
         if not summary_raw:
             summary_raw = title
 
+        # =========================
+        # 제목 번역
+        # =========================
         try:
-            summary = summarize(title + " " + summary_raw)
+            translated_title = translate_title(title)
+        except Exception as e:
+            print("TITLE ERROR:", e)
+            translated_title = "번역 실패"
+
+        # =========================
+        # 3줄 요약
+        # =========================
+        try:
+            summary = summarize(summary_raw)
         except Exception as e:
             print("SUMMARY ERROR:", e)
             summary = "요약 실패"
 
         msg += f"""
-📰 <b>{title_line}</b>
+📰 <b>원문 제목</b>
+{title_line}
 
-📌 <b>요약</b>
+🇰🇷 <b>한글 제목</b>
+{translated_title}
+
+📌 <b>3줄 요약</b>
 {summary}
 
 🔗 <a href="{link}">기사 보기</a>
@@ -197,10 +217,12 @@ def main():
 
     news = collect_news()
 
+    print(f"뉴스 개수: {len(news)}")
+
     grouped = group_news(news)
 
     # =========================
-    # 🔥 모든 나라 요약 먼저 완료
+    # 모든 뉴스 요약 먼저 완료
     # =========================
     country_messages = []
 
@@ -209,24 +231,27 @@ def main():
         if not articles:
             continue
 
+        print(f"{country} 요약 중...")
+
         msg = build_country_message(country, articles)
+
         country_messages.append(msg)
 
     print("✅ 모든 뉴스 요약 완료")
 
     # =========================
-    # 1️⃣ 첫 번째 메시지
+    # 첫 번째 메시지
     # =========================
     send_message(build_count_message(grouped))
 
     # =========================
-    # 2️⃣ 나라별 메시지
+    # 국가별 메시지 전송
     # =========================
     for msg in country_messages:
         send_message(msg)
 
     # =========================
-    # 3️⃣ 종료 메시지
+    # 종료 메시지
     # =========================
     send_message("✅ <b>일일 방산 브리핑 종료</b>")
 

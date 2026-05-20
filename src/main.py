@@ -45,6 +45,7 @@ def detect_country(text):
     t = (text or "").lower()
 
     mapping = {
+        # 아시아
         "japan":"🇯🇵 일본",
         "philippines":"🇵🇭 필리핀",
         "indonesia":"🇮🇩 인도네시아",
@@ -54,6 +55,12 @@ def detect_country(text):
         "bangladesh":"🇧🇩 방글라데시",
         "india":"🇮🇳 인도",
 
+        # 중앙아시아 추가
+        "uzbekistan":"🇺🇿 우즈베키스탄",
+        "kazakhstan":"🇰🇿 카자흐스탄",
+        "kyrgyzstan":"🇰🇬 키르기스스탄",
+
+        # 중남미
         "peru":"🇵🇪 페루",
         "chile":"🇨🇱 칠레",
         "colombia":"🇨🇴 콜롬비아",
@@ -70,16 +77,41 @@ def detect_country(text):
 
 
 # =========================
-# GROUP
+# GROUP NEWS
 # =========================
 def group_news(news):
 
-    grouped = {}
+    grouped = {
+        # 아시아
+        "🇯🇵 일본": [],
+        "🇵🇭 필리핀": [],
+        "🇮🇩 인도네시아": [],
+        "🇲🇾 말레이시아": [],
+        "🇻🇳 베트남": [],
+        "🇹🇭 태국": [],
+        "🇧🇩 방글라데시": [],
+        "🇮🇳 인도": [],
+
+        # 중앙아시아
+        "🇺🇿 우즈베키스탄": [],
+        "🇰🇿 카자흐스탄": [],
+        "🇰🇬 키르기스스탄": [],
+
+        # 중남미
+        "🇵🇪 페루": [],
+        "🇨🇱 칠레": [],
+        "🇨🇴 콜롬비아": [],
+        "🇦🇷 아르헨티나": [],
+        "🇲🇽 멕시코": [],
+        "🇧🇷 브라질": [],
+
+        "🌍 기타 국가": []
+    }
 
     for n in news:
 
-        title = n.get("title","")
-        summary = n.get("summary","")
+        title = n.get("title", "")
+        summary = n.get("summary", "")
 
         country = detect_country(title + summary)
 
@@ -104,7 +136,7 @@ def build_count_message(grouped):
 
 
 # =========================
-# COUNTRY SUMMARY MESSAGE (핵심 변경)
+# BUILD COUNTRY MESSAGE
 # =========================
 def build_country_message(country, articles):
 
@@ -113,24 +145,33 @@ def build_country_message(country, articles):
 
     for a in articles[:5]:
 
-        title = a.get("title","")
-        summary_raw = a.get("summary","")
-        link = a.get("link","")
+        title = a.get("title", "")
+        summary_raw = a.get("summary", "")
+        link = a.get("link", "")
 
-        published = a.get("published") or a.get("date") or a.get("pubDate") or ""
+        published = (
+            a.get("published")
+            or a.get("date")
+            or a.get("pubDate")
+            or ""
+        )
 
         if published:
             published = str(published)[:10]
             title_line = f"{title} ({published})"
         else:
-            title_line = title
+            title_line = f"{title} (No date)"
 
-        if not title or not summary_raw:
+        if not title:
             continue
+
+        if not summary_raw:
+            summary_raw = title
 
         try:
             summary = summarize(title + " " + summary_raw)
-        except:
+        except Exception as e:
+            print("SUMMARY ERROR:", e)
             summary = "요약 실패"
 
         msg += f"""
@@ -155,21 +196,41 @@ def main():
     print("🚀 뉴스 수집 시작")
 
     news = collect_news()
+
     grouped = group_news(news)
 
-    # 1️⃣ 카운트 메시지
-    send_message(build_count_message(grouped))
+    # =========================
+    # 🔥 모든 나라 요약 먼저 완료
+    # =========================
+    country_messages = []
 
-    # 2️⃣ 나라별 개별 메시지 (핵심)
     for country, articles in grouped.items():
 
         if not articles:
             continue
 
         msg = build_country_message(country, articles)
+        country_messages.append(msg)
+
+    print("✅ 모든 뉴스 요약 완료")
+
+    # =========================
+    # 1️⃣ 첫 번째 메시지
+    # =========================
+    send_message(build_count_message(grouped))
+
+    # =========================
+    # 2️⃣ 나라별 메시지
+    # =========================
+    for msg in country_messages:
         send_message(msg)
 
-    print("✅ 완료")
+    # =========================
+    # 3️⃣ 종료 메시지
+    # =========================
+    send_message("✅ <b>일일 방산 브리핑 종료</b>")
+
+    print("✅ 전체 완료")
 
 
 if __name__ == "__main__":

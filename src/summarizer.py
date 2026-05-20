@@ -1,44 +1,72 @@
-import os
 from openai import OpenAI
+import os
 
-# OpenRouter 클라이언트 설정
 client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY"),
-    base_url="https://openrouter.ai/api/v1"
 )
 
-def summarize(text):
 
-    if not text:
-        return "❌ 입력 없음"
-
-    prompt = f"""
-너는 방산 전문 분석가다.
-
-다음 해외 방산 뉴스를 한국어로 정리해라:
-
-[출력 형식]
-1. 한국어 번역
-2. 3줄 핵심 요약
-3. 중요도 (1~5)
-4. 국가 / 군종 / 기업 태그
-
-[기사]
-{text}
-"""
+# =========================
+# 제목 번역
+# =========================
+def translate_title(title):
 
     try:
-        response = client.chat.completions.create(
-            # ✅ 가장 안정적인 OpenRouter 모델
-            model="openai/gpt-4o-mini",
 
+        response = client.chat.completions.create(
+            model="openai/gpt-3.5-turbo",
             messages=[
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "Translate the defense news title into natural Korean."
+                },
+                {
+                    "role": "user",
+                    "content": title
+                }
             ],
-            temperature=0.3
+            max_tokens=100
         )
 
-        return response.choices[0].message.content
+        return response.choices[0].message.content.strip()
 
     except Exception as e:
-        return f"❌ OpenRouter API 오류: {str(e)}"
+        print("TITLE TRANSLATE ERROR:", e)
+        return "번역 실패"
+
+
+# =========================
+# 3줄 요약
+# =========================
+def summarize(text):
+
+    try:
+
+        response = client.chat.completions.create(
+            model="openai/gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+Summarize the defense news in Korean within 3 concise bullet points.
+
+IMPORTANT:
+- Do NOT repeat the title
+- Focus only on 핵심 내용
+- Keep it short and professional
+"""
+                },
+                {
+                    "role": "user",
+                    "content": text
+                }
+            ],
+            max_tokens=200
+        )
+
+        return response.choices[0].message.content.strip()
+
+    except Exception as e:
+        print("SUMMARY ERROR:", e)
+        return "요약 실패"

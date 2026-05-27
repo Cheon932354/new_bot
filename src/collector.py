@@ -1,252 +1,128 @@
 import feedparser
-from datetime import datetime, timedelta
-import time
 
-# 국가별 현지 RSS
-COUNTRY_FEEDS = {
 
-    "브라질": [
-        "https://www.defesaaereanaval.com.br/feed",
-    ],
+# =========================
+# RSS FEEDS
+# =========================
+RSS_FEEDS = {
 
-    "칠레": [
-        "https://www.infodefensa.com/texto-diario/mostrar/feeds"
-    ],
-
-    "페루": [
-        "https://www.infodefensa.com/peru/rss"
-    ],
-
-    "콜롬비아": [
-        "https://www.infodefensa.com/colombia/rss"
-    ],
-
-    "아르헨티나": [
-        "https://www.infodefensa.com/argentina/rss"
-    ],
-
-    "베트남": [
-        "https://vietnamdefence.com/feed"
-    ],
-
-    "인도": [
-        "https://www.indiandefensenews.in/feeds/posts/default"
-    ]
-}
-
-# 글로벌 방산 RSS
-GLOBAL_FEEDS = [
-
+    # =========================
+    # 글로벌 방산
+    # =========================
+    "Defense News":
     "https://www.defensenews.com/arc/outboundfeeds/rss/",
 
+    "Breaking Defense":
     "https://breakingdefense.com/feed/",
 
-    "https://www.navalnews.com/feed/"
-]
+    "Army Recognition":
+    "https://www.armyrecognition.com/rss.xml",
 
-# 방산 키워드
-DEFENSE_KEYWORDS = [
+    "Defense Blog":
+    "https://defence-blog.com/feed/",
 
-    "navy",
-    "air force",
-    "army",
-    "defense",
-    "military",
-    "missile",
-    "fighter",
-    "frigate",
-    "submarine",
-    "tank",
-    "weapon",
-    "drone",
-    "radar",
-    "artillery",
-    "warship",
-    "destroyer",
+    "Naval News":
+    "https://www.navalnews.com/feed/",
 
-    "defensa",
-    "armada",
-    "militar",
-    "fragata",
-    "submarino",
+    "Defense One":
+    "https://www.defenseone.com/rss/all/",
 
-    "defesa",
-    "marinha",
-    "fragata",
-    "submarino"
-]
+    # =========================
+    # 아시아
+    # =========================
+    "The Diplomat":
+    "https://thediplomat.com/category/asia-defense/feed/",
 
-def is_defense_news(text):
+    "Indian Defense News":
+    "https://www.indiandefensenews.in/feeds/posts/default?alt=rss",
 
-    text = text.lower()
+    "Livefist":
+    "https://www.livefistdefence.com/feed",
 
-    for keyword in DEFENSE_KEYWORDS:
+    # =========================
+    # 중남미
+    # =========================
+    "Infodefensa":
+    "https://www.infodefensa.com/rss",
 
-        if keyword in text:
-            return True
+    "MercoPress":
+    "https://en.mercopress.com/rss",
 
-    return False
+    # =========================
+    # Google News RSS
+    # =========================
+    "Google Brazil Defense":
+    "https://news.google.com/rss/search?q=Brazil+defense",
 
-# 글로벌 RSS 국가 자동분류
-def detect_country(text):
+    "Google India Defense":
+    "https://news.google.com/rss/search?q=India+defense",
 
-    text = text.lower()
+    "Google Philippines Defense":
+    "https://news.google.com/rss/search?q=Philippines+military",
 
-    mapping = {
+    "Google Peru Defense":
+    "https://news.google.com/rss/search?q=Peru+defense",
 
-        "brazil": "브라질",
-        "embraer": "브라질",
+    "Google Chile Defense":
+    "https://news.google.com/rss/search?q=Chile+defense",
 
-        "chile": "칠레",
-        "asmar": "칠레",
+    "Google Indonesia Defense":
+    "https://news.google.com/rss/search?q=Indonesia+military",
 
-        "peru": "페루",
+    # =========================
+    # 국내 방산
+    # =========================
+    "연합뉴스 정치":
+    "https://www.yna.co.kr/rss/politics.xml",
 
-        "colombia": "콜롬비아",
-        "cotecmar": "콜롬비아",
+    "국방일보":
+    "https://kookbang.dema.mil.kr/rss.xml",
 
-        "argentina": "아르헨티나",
+    "디펜스타임즈":
+    "http://www.defensetimes.kr/rss/allArticle.xml",
+}
 
-        "india": "인도",
-        "hal": "인도",
-        "drdo": "인도",
 
-        "indonesia": "인도네시아",
-        "pt pal": "인도네시아",
-
-        "philippines": "필리핀",
-
-        "vietnam": "베트남",
-
-        "thailand": "태국",
-
-        "hanwha": "한국기업",
-        "hyundai rotem": "한국기업",
-        "lig nex1": "한국기업",
-        "kai": "한국기업"
-    }
-
-    for keyword, country in mapping.items():
-
-        if keyword in text:
-            return country
-
-    return None
-
+# =========================
+# NEWS COLLECTOR
+# =========================
 def collect_news():
 
-    articles = []
+    news_list = []
 
-    now = datetime.utcnow()
-    seven_days_ago = now - timedelta(days=7)
+    for source, url in RSS_FEEDS.items():
 
-    # =========================
-    # 국가별 RSS
-    # =========================
-
-    for country, feeds in COUNTRY_FEEDS.items():
-
-        for url in feeds:
-
-            try:
-
-                feed = feedparser.parse(url)
-
-                for entry in feed.entries[:15]:
-
-                    title = entry.get("title", "")
-                    summary = entry.get("summary", "")
-                    link = entry.get("link", "")
-
-                    published = None
-
-                    if "published_parsed" in entry:
-
-                        published = datetime.fromtimestamp(
-                            time.mktime(
-                                entry.published_parsed
-                            )
-                        )
-
-                    if published and published < seven_days_ago:
-                        continue
-
-                    combined_text = (
-                        title + " " + summary
-                    )
-
-                    if not is_defense_news(
-                        combined_text
-                    ):
-                        continue
-
-                    articles.append({
-                        "country": country,
-                        "title": title,
-                        "summary": summary,
-                        "link": link
-                    })
-
-            except Exception as e:
-
-                print(f"RSS 오류: {url}")
-                print(e)
-
-    # =========================
-    # 글로벌 RSS
-    # =========================
-
-    for url in GLOBAL_FEEDS:
+        print(f"수집 중: {source}")
 
         try:
 
             feed = feedparser.parse(url)
 
-            for entry in feed.entries[:20]:
+            for entry in feed.entries[:15]:
 
-                title = entry.get("title", "")
-                summary = entry.get("summary", "")
-                link = entry.get("link", "")
+                news = {
 
-                published = None
+                    "source": source,
 
-                if "published_parsed" in entry:
+                    "title":
+                    entry.get("title", ""),
 
-                    published = datetime.fromtimestamp(
-                        time.mktime(
-                            entry.published_parsed
-                        )
-                    )
+                    "summary":
+                    entry.get("summary", "")
+                    or entry.get("description", ""),
 
-                if published and published < seven_days_ago:
-                    continue
+                    "link":
+                    entry.get("link", ""),
 
-                combined_text = (
-                    title + " " + summary
-                )
+                    "published":
+                    entry.get("published", "")
+                    or entry.get("updated", "")
+                    or entry.get("pubDate", "")
+                }
 
-                if not is_defense_news(
-                    combined_text
-                ):
-                    continue
-
-                detected_country = detect_country(
-                    combined_text
-                )
-
-                if not detected_country:
-                    continue
-
-                articles.append({
-                    "country": detected_country,
-                    "title": title,
-                    "summary": summary,
-                    "link": link
-                })
+                news_list.append(news)
 
         except Exception as e:
+            print(f"RSS ERROR ({source}):", e)
 
-            print(f"글로벌 RSS 오류: {url}")
-            print(e)
-
-    return articles
+    return news_list

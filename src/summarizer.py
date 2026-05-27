@@ -66,8 +66,11 @@ def summarize(text):
 - 무기체계 명칭(F-35, Patriot, K9 등)만 영어 유지 가능
 - 나머지는 자연스러운 한국어로 번역
 - 제목 반복 금지
-- 핵심 내용만 3줄로 요약
-- 각 줄은 "-" 로 시작
+- 반드시 정확히 3줄로 요약
+- 각 줄은 반드시 "-" 로 시작
+- 각 줄은 최대 40자 내외로 짧게 작성
+- 문장은 반드시 완결형으로 끝낼 것
+- 문장이 중간에 끊기지 않게 할 것
 - 간결하고 전문적인 문체 사용
 """
                 },
@@ -76,7 +79,7 @@ def summarize(text):
                     "content": text
                 }
             ],
-            max_tokens=220
+            max_tokens=300
         )
 
         return response.choices[0].message.content.strip()

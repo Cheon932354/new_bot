@@ -17,7 +17,7 @@ BASE = f"https://api.telegram.org/bot{TOKEN}"
 # =========================
 def send_message(text):
 
-    res = requests.post(
+    requests.post(
         BASE + "/sendMessage",
         json={
             "chat_id": CHAT_ID,
@@ -27,14 +27,35 @@ def send_message(text):
         }
     )
 
-    print("TELEGRAM:", res.status_code)
-
 
 # =========================
 # DATE
 # =========================
 def get_date():
     return datetime.now().strftime("%Y-%m-%d")
+
+
+# =========================
+# 국내 대외협력 키워드
+# =========================
+EXPORT_KEYWORDS = [
+    "브라질",
+    "인도",
+    "필리핀",
+    "인도네시아",
+    "페루",
+    "칠레",
+    "콜롬비아",
+    "아르헨티나",
+    "멕시코",
+    "말레이시아",
+    "태국",
+    "베트남",
+    "방글라데시",
+    "우즈베키스탄",
+    "카자흐스탄",
+    "키르기스스탄"
+]
 
 
 # =========================
@@ -46,7 +67,6 @@ def detect_country(text):
 
     mapping = {
 
-        # 아시아
         "japan":"🇯🇵 일본",
         "philippines":"🇵🇭 필리핀",
         "indonesia":"🇮🇩 인도네시아",
@@ -56,18 +76,16 @@ def detect_country(text):
         "bangladesh":"🇧🇩 방글라데시",
         "india":"🇮🇳 인도",
 
-        # 중앙아시아
         "uzbekistan":"🇺🇿 우즈베키스탄",
         "kazakhstan":"🇰🇿 카자흐스탄",
         "kyrgyzstan":"🇰🇬 키르기스스탄",
 
-        # 중남미
         "peru":"🇵🇪 페루",
         "chile":"🇨🇱 칠레",
         "colombia":"🇨🇴 콜롬비아",
         "argentina":"🇦🇷 아르헨티나",
         "mexico":"🇲🇽 멕시코",
-        "brazil":"🇧🇷 브라질"
+        "brazil":"🇧🇷 브라질",
     }
 
     for k, v in mapping.items():
@@ -78,73 +96,93 @@ def detect_country(text):
 
 
 # =========================
+# 국내 대외협력 기사 판단
+# =========================
+def is_korean_export_news(article):
+
+    source = article.get("source", "")
+
+    korean_sources = [
+        "연합뉴스 정치",
+        "국방일보",
+        "디펜스타임즈"
+    ]
+
+    if source not in korean_sources:
+        return False
+
+    text = (
+        article.get("title", "")
+        + " "
+        + article.get("summary", "")
+    )
+
+    for keyword in EXPORT_KEYWORDS:
+        if keyword in text:
+            return True
+
+    return False
+
+
+# =========================
 # GROUP NEWS
 # =========================
 def group_news(news):
 
-    grouped = {
+    domestic_export = []
 
-        # 아시아
-        "🇯🇵 일본": [],
-        "🇵🇭 필리핀": [],
-        "🇮🇩 인도네시아": [],
-        "🇲🇾 말레이시아": [],
-        "🇻🇳 베트남": [],
-        "🇹🇭 태국": [],
-        "🇧🇩 방글라데시": [],
-        "🇮🇳 인도": [],
-
-        # 중앙아시아
-        "🇺🇿 우즈베키스탄": [],
-        "🇰🇿 카자흐스탄": [],
-        "🇰🇬 키르기스스탄": [],
-
-        # 중남미
-        "🇵🇪 페루": [],
-        "🇨🇱 칠레": [],
-        "🇨🇴 콜롬비아": [],
-        "🇦🇷 아르헨티나": [],
-        "🇲🇽 멕시코": [],
-        "🇧🇷 브라질": [],
-
-        # 기타
-        "🌍 기타 국가": []
-    }
+    foreign = {}
 
     for n in news:
+
+        # 국내 대외협력
+        if is_korean_export_news(n):
+            domestic_export.append(n)
+            continue
 
         title = n.get("title", "")
         summary = n.get("summary", "")
 
         country = detect_country(title + summary)
 
-        grouped.setdefault(country, []).append(n)
+        foreign.setdefault(country, [])
+        foreign[country].append(n)
 
-    return grouped
+    return domestic_export, foreign
 
 
 # =========================
 # COUNT MESSAGE
 # =========================
-def build_count_message(grouped):
+def build_count_message(domestic_export, foreign):
 
     date = get_date()
 
     msg = f"📊 <b>방산 뉴스 업데이트 ({date})</b>\n\n"
 
-    for country, articles in grouped.items():
+    msg += "━━━━━━━━━━━━━━━\n"
+    msg += "🇰🇷 <b>국내 방산 대외협력</b>\n"
+    msg += "━━━━━━━━━━━━━━━\n\n"
+
+    msg += f"🇰🇷 한국 : {len(domestic_export)}건\n\n"
+
+    msg += "━━━━━━━━━━━━━━━\n"
+    msg += "🌏 <b>해외 방산 뉴스</b>\n"
+    msg += "━━━━━━━━━━━━━━━\n\n"
+
+    for country, articles in foreign.items():
         msg += f"{country} : {len(articles)}건\n"
 
     return msg
 
 
 # =========================
-# COUNTRY MESSAGE
+# BUILD MESSAGE
 # =========================
-def build_country_message(country, articles):
+def build_message(title_text, articles):
 
     msg = f"━━━━━━━━━━━━━━━\n"
-    msg += f"🇺🇳 <b>{country}</b>\n\n"
+    msg += f"{title_text}\n\n"
 
     for a in articles[:5]:
 
@@ -154,41 +192,17 @@ def build_country_message(country, articles):
 
         published = (
             a.get("published")
-            or a.get("date")
-            or a.get("pubDate")
             or ""
         )
 
-        # 날짜 있으면만 표시
         if published:
             published = str(published)[:10]
             title_line = f"{title} ({published})"
         else:
             title_line = title
 
-        if not title:
-            continue
-
-        if not summary_raw:
-            summary_raw = title
-
-        # =========================
-        # 제목 번역
-        # =========================
-        try:
-            translated_title = translate_title(title)
-        except Exception as e:
-            print("TITLE ERROR:", e)
-            translated_title = "번역 실패"
-
-        # =========================
-        # 3줄 요약
-        # =========================
-        try:
-            summary = summarize(summary_raw)
-        except Exception as e:
-            print("SUMMARY ERROR:", e)
-            summary = "요약 실패"
+        translated_title = translate_title(title)
+        summary = summarize(summary_raw)
 
         msg += f"""
 📰 <b>원문 제목</b>
@@ -213,49 +227,51 @@ def build_country_message(country, articles):
 # =========================
 def main():
 
-    print("🚀 뉴스 수집 시작")
-
     news = collect_news()
 
-    print(f"뉴스 개수: {len(news)}")
+    domestic_export, foreign = group_news(news)
 
-    grouped = group_news(news)
+    # 모든 요약 먼저 완료
+    domestic_msg = None
 
-    # =========================
-    # 모든 뉴스 요약 먼저 완료
-    # =========================
-    country_messages = []
+    if domestic_export:
+        domestic_msg = build_message(
+            "🇰🇷 <b>국내 방산 대외협력 브리핑</b>",
+            domestic_export
+        )
 
-    for country, articles in grouped.items():
+    foreign_msgs = []
 
-        if not articles:
-            continue
+    for country, articles in foreign.items():
 
-        print(f"{country} 요약 중...")
+        msg = build_message(
+            f"🌏 <b>{country} 방산 브리핑</b>",
+            articles
+        )
 
-        msg = build_country_message(country, articles)
-
-        country_messages.append(msg)
-
-    print("✅ 모든 뉴스 요약 완료")
-
-    # =========================
-    # 첫 번째 메시지
-    # =========================
-    send_message(build_count_message(grouped))
+        foreign_msgs.append(msg)
 
     # =========================
-    # 국가별 메시지 전송
+    # 메시지 전송
     # =========================
-    for msg in country_messages:
+    send_message(
+        build_count_message(
+            domestic_export,
+            foreign
+        )
+    )
+
+    # 국내
+    if domestic_msg:
+        send_message(domestic_msg)
+
+    # 해외
+    for msg in foreign_msgs:
         send_message(msg)
 
-    # =========================
-    # 종료 메시지
-    # =========================
-    send_message("✅ <b>일일 방산 브리핑 종료</b>")
-
-    print("✅ 전체 완료")
+    send_message(
+        "✅ <b>일일 방산 브리핑 종료</b>"
+    )
 
 
 if __name__ == "__main__":

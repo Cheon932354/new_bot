@@ -1,10 +1,22 @@
-from openai import OpenAI
+# =========================
+# src/summarizer.py
+# =========================
+
 import os
+from openai import OpenAI
 
 
-client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
-)
+# =========================
+# OpenAI Client
+# =========================
+def get_client():
+
+    api_key = os.getenv("OPENAI_API_KEY")
+
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY 없음")
+
+    return OpenAI(api_key=api_key)
 
 
 # =========================
@@ -14,15 +26,20 @@ def translate_title(title):
 
     try:
 
+        client = get_client()
+
         response = client.chat.completions.create(
+
             model="gpt-4o-mini",
 
             messages=[
+
                 {
                     "role": "system",
                     "content":
                     "Translate defense news titles into natural Korean."
                 },
+
                 {
                     "role": "user",
                     "content": title
@@ -46,18 +63,18 @@ def translate_title(title):
 # =========================
 def summarize(text):
 
-    # =========================
     # fallback
-    # =========================
     if not text or len(text.strip()) < 80:
 
         return (
             "• 기사 본문 요약 데이터 부족\n"
-            "• RSS 원문 기반 최신 방산 기사\n"
+            "• RSS 기반 최신 방산 기사\n"
             "• 상세 내용은 원문 기사 참고"
         )
 
     try:
+
+        client = get_client()
 
         response = client.chat.completions.create(
 
@@ -76,7 +93,7 @@ def summarize(text):
                     Rules:
                     - EXACTLY 3 bullet points
                     - concise but informative
-                    - preserve military/defense meaning
+                    - preserve defense/military meaning
                     - each bullet under 2 lines
                     - no markdown
                     """
@@ -93,7 +110,6 @@ def summarize(text):
 
         result = response.choices[0].message.content.strip()
 
-        # 빈 응답 방지
         if not result:
 
             return (

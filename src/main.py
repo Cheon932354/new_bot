@@ -36,48 +36,6 @@ def get_date():
 
 
 # =========================
-# 국내 대외협력 키워드
-# =========================
-EXPORT_KEYWORDS = [
-
-    "브라질",
-    "인도",
-    "필리핀",
-    "인도네시아",
-    "페루",
-    "칠레",
-    "콜롬비아",
-    "아르헨티나",
-    "멕시코",
-    "말레이시아",
-    "태국",
-    "베트남",
-    "방글라데시",
-    "우즈베키스탄",
-    "카자흐스탄",
-    "키르기스스탄",
-
-    # 영어 키워드
-    "brazil",
-    "india",
-    "philippines",
-    "indonesia",
-    "peru",
-    "chile",
-    "colombia",
-    "argentina",
-    "mexico",
-    "malaysia",
-    "thailand",
-    "vietnam",
-    "bangladesh",
-    "uzbekistan",
-    "kazakhstan",
-    "kyrgyzstan",
-]
-
-
-# =========================
 # COUNTRY DETECT
 # =========================
 def detect_country(text):
@@ -121,14 +79,13 @@ def detect_country(text):
         if k in t:
             return v
 
-    # 기타국가 제거
     return None
 
 
 # =========================
-# 국내 대외협력 기사 판단
+# 국내 방산 기사 판단
 # =========================
-def is_korean_export_news(article):
+def is_korean_defense_news(article):
 
     source = article.get("source", "")
 
@@ -138,6 +95,7 @@ def is_korean_export_news(article):
         "디펜스타임즈"
     ]
 
+    # 국내 RSS만 허용
     if source not in korean_sources:
         return False
 
@@ -147,7 +105,56 @@ def is_korean_export_news(article):
         + article.get("summary", "")
     ).lower()
 
-    for keyword in EXPORT_KEYWORDS:
+    defense_keywords = [
+
+        # 방산업체
+        "hanwha",
+        "hyundai rotem",
+        "lig nex1",
+        "대한항공",
+
+        "한화",
+        "현대로템",
+        "lig넥스원",
+        "대한항공",
+
+        # 무기체계
+        "kf-21",
+        "k9",
+        "k2",
+        "천무",
+        "redback",
+        "장갑차",
+        "전차",
+        "미사일",
+        "전투기",
+        "잠수함",
+        "호위함",
+
+        # 방산 일반
+        "방산",
+        "국방",
+        "무기",
+        "수출",
+        "협력",
+
+        # 해외 협력 국가
+        "브라질",
+        "인도",
+        "필리핀",
+        "인도네시아",
+        "페루",
+        "칠레",
+        "콜롬비아",
+        "아르헨티나",
+        "멕시코",
+        "말레이시아",
+        "태국",
+        "베트남",
+        "방글라데시",
+    ]
+
+    for keyword in defense_keywords:
 
         if keyword.lower() in text:
             return True
@@ -160,7 +167,7 @@ def is_korean_export_news(article):
 # =========================
 def group_news(news):
 
-    domestic_export = []
+    domestic_news = []
 
     foreign = {
 
@@ -188,11 +195,11 @@ def group_news(news):
     for n in news:
 
         # =========================
-        # 국내 대외협력 기사
+        # 국내 방산 기사
         # =========================
-        if is_korean_export_news(n):
+        if is_korean_defense_news(n):
 
-            domestic_export.append(n)
+            domestic_news.append(n)
             continue
 
         title = n.get("title", "")
@@ -201,7 +208,7 @@ def group_news(news):
         country = detect_country(title + summary)
 
         # =========================
-        # 기타 국가 제거
+        # 기타국가 제거
         # =========================
         if not country:
             continue
@@ -209,13 +216,13 @@ def group_news(news):
         foreign.setdefault(country, [])
         foreign[country].append(n)
 
-    return domestic_export, foreign
+    return domestic_news, foreign
 
 
 # =========================
 # COUNT MESSAGE
 # =========================
-def build_count_message(domestic_export, foreign):
+def build_count_message(domestic_news, foreign):
 
     date = get_date()
 
@@ -225,10 +232,10 @@ def build_count_message(domestic_export, foreign):
     # 국내
     # =========================
     msg += "━━━━━━━━━━━━━━━\n"
-    msg += "🇰🇷 <b>국내 방산 대외협력</b>\n"
+    msg += "🇰🇷 <b>국내 방산 뉴스</b>\n"
     msg += "━━━━━━━━━━━━━━━\n\n"
 
-    msg += f"🇰🇷 한국 : {len(domestic_export)}건\n\n"
+    msg += f"🇰🇷 한국 : {len(domestic_news)}건\n\n"
 
     # =========================
     # 해외
@@ -269,14 +276,8 @@ def build_message(title_text, articles):
         else:
             title_line = title
 
-        # =========================
-        # 제목 번역
-        # =========================
         translated_title = translate_title(title)
 
-        # =========================
-        # 3줄 요약
-        # =========================
         summary = summarize(summary_raw)
 
         msg += f"""
@@ -308,20 +309,20 @@ def main():
 
     print(f"수집 기사 수: {len(news)}")
 
-    domestic_export, foreign = group_news(news)
+    domestic_news, foreign = group_news(news)
 
     # =========================
     # 국내 메시지 생성
     # =========================
     domestic_msg = None
 
-    if domestic_export:
+    if domestic_news:
 
-        print("🇰🇷 국내 대외협력 요약 중...")
+        print("🇰🇷 국내 방산 뉴스 요약 중...")
 
         domestic_msg = build_message(
-            "🇰🇷 <b>국내 방산 대외협력 브리핑</b>",
-            domestic_export
+            "🇰🇷 <b>국내 방산 브리핑</b>",
+            domestic_news
         )
 
     # =========================
@@ -350,7 +351,7 @@ def main():
     # =========================
     send_message(
         build_count_message(
-            domestic_export,
+            domestic_news,
             foreign
         )
     )

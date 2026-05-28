@@ -1,4 +1,5 @@
 import feedparser
+
 from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
 
@@ -99,7 +100,7 @@ RSS_FEEDS = {
 # =========================
 def is_recent_news(published):
 
-    # 날짜 없는 기사 허용
+    # 날짜 자체가 없는 RSS는 허용
     if not published:
         return True
 
@@ -113,11 +114,19 @@ def is_recent_news(published):
 
         diff = now - article_time
 
-        # 최근 48시간
+        # 미래 날짜 제거
+        if diff.total_seconds() < 0:
+            return False
+
+        # 최근 48시간 기사만 허용
         return diff <= timedelta(days=2)
 
+    # 날짜 파싱 실패 시 제거
     except Exception:
-        return True
+
+        print("날짜 파싱 실패:", published)
+
+        return False
 
 
 # =========================
@@ -147,19 +156,19 @@ def normalize_title(title):
 
 
 # =========================
-# NEWS COLLECTOR
+# 뉴스 수집
 # =========================
 def collect_news():
 
     news_list = []
 
-    # 중복 제거
+    # 중복 제거용
     seen_titles = set()
     seen_links = set()
 
     for source, url in RSS_FEEDS.items():
 
-        print(f"수집 중: {source}")
+        print(f"\n📡 수집 중: {source}")
 
         try:
 
@@ -173,17 +182,8 @@ def collect_news():
                 normalized = normalize_title(title)
 
                 # =========================
-                # 링크 중복 제거
+                # 날짜
                 # =========================
-                if link in seen_links:
-                    continue
-
-                # =========================
-                # 제목 중복 제거
-                # =========================
-                if normalized in seen_titles:
-                    continue
-
                 published = (
                     entry.get("published", "")
                     or entry.get("updated", "")
@@ -194,6 +194,18 @@ def collect_news():
                 # 최신 뉴스 필터
                 # =========================
                 if not is_recent_news(published):
+                    continue
+
+                # =========================
+                # 링크 중복 제거
+                # =========================
+                if link in seen_links:
+                    continue
+
+                # =========================
+                # 제목 중복 제거
+                # =========================
+                if normalized in seen_titles:
                     continue
 
                 summary = (
@@ -219,9 +231,13 @@ def collect_news():
                 seen_titles.add(normalized)
                 seen_links.add(link)
 
-        except Exception as e:
-            print(f"RSS ERROR ({source}):", e)
+                print("✅", title)
 
-    print(f"최종 기사 수: {len(news_list)}")
+        except Exception as e:
+
+            print(f"❌ RSS ERROR ({source})")
+            print(e)
+
+    print(f"\n📰 최종 기사 수: {len(news_list)}")
 
     return news_list

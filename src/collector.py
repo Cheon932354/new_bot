@@ -1,3 +1,8 @@
+# =========================
+# src/collector.py
+# 가장 추천하는 최종 구조
+# =========================
+
 import feedparser
 
 from datetime import datetime, timedelta
@@ -51,9 +56,9 @@ RSS_FEEDS = {
     "MercoPress":
     "https://en.mercopress.com/rss",
 
-    # =========================
+    # ==================================================
     # 브라질
-    # =========================
+    # ==================================================
     "Brazil Defense":
     "https://news.google.com/rss/search?q=Brazil+defense",
 
@@ -72,132 +77,135 @@ RSS_FEEDS = {
     "Brazil Air Force":
     "https://news.google.com/rss/search?q=Brazil+air+force",
 
-    "Infodefensa Brazil":
-    "https://news.google.com/rss/search?q=site:infodefensa.com+Brazil+defense",
-
-    # =========================
+    # ==================================================
     # 인도
-    # =========================
+    # ==================================================
     "India Defense":
     "https://news.google.com/rss/search?q=India+defense",
 
     "India Military":
     "https://news.google.com/rss/search?q=India+military",
 
-    "India Defense Industry":
-    "https://news.google.com/rss/search?q=India+defense+industry",
-
     "India Navy":
     "https://news.google.com/rss/search?q=India+navy",
 
-    # =========================
+    # ==================================================
+    # 일본
+    # ==================================================
+    "Japan Defense":
+    "https://news.google.com/rss/search?q=Japan+defense",
+
+    "Japan Military":
+    "https://news.google.com/rss/search?q=Japan+military",
+
+    # ==================================================
     # 필리핀
-    # =========================
+    # ==================================================
+    "Philippines Defense":
+    "https://news.google.com/rss/search?q=Philippines+defense",
+
     "Philippines Military":
     "https://news.google.com/rss/search?q=Philippines+military",
 
     "Philippines Navy":
     "https://news.google.com/rss/search?q=Philippines+navy",
 
-    # =========================
+    # ==================================================
     # 인도네시아
-    # =========================
-    "Indonesia Military":
-    "https://news.google.com/rss/search?q=Indonesia+military",
-
+    # ==================================================
     "Indonesia Defense":
     "https://news.google.com/rss/search?q=Indonesia+defense",
 
-    # =========================
-    # 일본
-    # =========================
-    "Japan Defense":
-    "https://news.google.com/rss/search?q=Japan+defense",
+    "Indonesia Military":
+    "https://news.google.com/rss/search?q=Indonesia+military",
 
-    # =========================
+    # ==================================================
     # 태국
-    # =========================
+    # ==================================================
+    "Thailand Defense":
+    "https://news.google.com/rss/search?q=Thailand+defense",
+
     "Thailand Military":
     "https://news.google.com/rss/search?q=Thailand+military",
 
-    # =========================
+    # ==================================================
     # 베트남
-    # =========================
+    # ==================================================
     "Vietnam Defense":
     "https://news.google.com/rss/search?q=Vietnam+defense",
 
-    # =========================
+    "Vietnam Military":
+    "https://news.google.com/rss/search?q=Vietnam+military",
+
+    # ==================================================
     # 말레이시아
-    # =========================
+    # ==================================================
     "Malaysia Defense":
     "https://news.google.com/rss/search?q=Malaysia+defense",
 
-    # =========================
+    # ==================================================
     # 방글라데시
-    # =========================
+    # ==================================================
     "Bangladesh Defense":
     "https://news.google.com/rss/search?q=Bangladesh+defense",
 
-    # =========================
+    # ==================================================
+    # 캄보디아
+    # ==================================================
+    "Cambodia Defense":
+    "https://news.google.com/rss/search?q=Cambodia+defense",
+
+    "Cambodia Military":
+    "https://news.google.com/rss/search?q=Cambodia+military",
+
+    # ==================================================
     # 페루
-    # =========================
+    # ==================================================
     "Peru Defense":
     "https://news.google.com/rss/search?q=Peru+defense",
 
-    "Infodefensa Peru":
-    "https://news.google.com/rss/search?q=site:infodefensa.com+Peru+defense",
-
-    # =========================
+    # ==================================================
     # 칠레
-    # =========================
+    # ==================================================
     "Chile Defense":
     "https://news.google.com/rss/search?q=Chile+defense",
 
-    "Infodefensa Chile":
-    "https://news.google.com/rss/search?q=site:infodefensa.com+Chile+defense",
-
-    # =========================
+    # ==================================================
     # 콜롬비아
-    # =========================
+    # ==================================================
     "Colombia Defense":
     "https://news.google.com/rss/search?q=Colombia+defense",
 
-    "Infodefensa Colombia":
-    "https://news.google.com/rss/search?q=site:infodefensa.com+Colombia+defense",
-
-    # =========================
+    # ==================================================
     # 아르헨티나
-    # =========================
+    # ==================================================
     "Argentina Defense":
     "https://news.google.com/rss/search?q=Argentina+defense",
 
-    # =========================
+    # ==================================================
     # 우루과이
-    # =========================
+    # ==================================================
     "Uruguay Defense":
     "https://news.google.com/rss/search?q=Uruguay+defense",
 
-    "Uruguay Military":
-    "https://news.google.com/rss/search?q=Uruguay+military",
-
-    # =========================
+    # ==================================================
     # 에콰도르
-    # =========================
+    # ==================================================
     "Ecuador Defense":
     "https://news.google.com/rss/search?q=Ecuador+defense",
 
-    "Ecuador Military":
-    "https://news.google.com/rss/search?q=Ecuador+military",
-
-    # =========================
+    # ==================================================
     # 멕시코
-    # =========================
+    # ==================================================
     "Mexico Defense":
     "https://news.google.com/rss/search?q=Mexico+defense",
 
-    # =========================
+    "Mexico Military":
+    "https://news.google.com/rss/search?q=Mexico+military",
+
+    # ==================================================
     # 중앙아시아
-    # =========================
+    # ==================================================
     "Kazakhstan Military":
     "https://news.google.com/rss/search?q=Kazakhstan+military",
 
@@ -207,9 +215,9 @@ RSS_FEEDS = {
     "Kyrgyzstan Military":
     "https://news.google.com/rss/search?q=Kyrgyzstan+military",
 
-    # =========================
+    # ==================================================
     # 국내
-    # =========================
+    # ==================================================
     "연합뉴스 정치":
     "https://www.yna.co.kr/rss/politics.xml",
 
@@ -222,10 +230,11 @@ RSS_FEEDS = {
 
 
 # =========================
-# 최근 뉴스 여부
+# 날짜 검사
 # =========================
 def is_recent_news(published):
 
+    # 날짜 없는 RSS 허용
     if not published:
         return True
 
@@ -239,16 +248,19 @@ def is_recent_news(published):
 
         diff = now - article_time
 
+        # 미래 날짜 제거
         if diff.total_seconds() < 0:
             return False
 
+        # 최근 48시간
         return diff <= timedelta(days=2)
 
     except Exception:
 
         print("날짜 파싱 실패:", published)
 
-        return False
+        # Google RSS 대응
+        return True
 
 
 # =========================
@@ -308,9 +320,30 @@ def collect_news():
                     or entry.get("pubDate", "")
                 )
 
-                if not is_recent_news(published):
-                    continue
+                # =========================
+                # 날짜 필터
+                # =========================
 
+                # Google RSS는 유연 처리
+                if "google.com/rss" in url:
+
+                    try:
+
+                        if not is_recent_news(published):
+                            continue
+
+                    except:
+                        pass
+
+                # 일반 RSS는 엄격 처리
+                else:
+
+                    if not is_recent_news(published):
+                        continue
+
+                # =========================
+                # 중복 제거
+                # =========================
                 if link in seen_links:
                     continue
 

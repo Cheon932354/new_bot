@@ -167,7 +167,25 @@ def is_korean_defense_news(article):
 # =========================
 def group_news(news):
 
-    domestic_news = []
+    domestic = {
+
+        "🇧🇷 브라질": [],
+        "🇮🇳 인도": [],
+        "🇵🇭 필리핀": [],
+        "🇮🇩 인도네시아": [],
+        "🇲🇾 말레이시아": [],
+        "🇻🇳 베트남": [],
+        "🇹🇭 태국": [],
+        "🇧🇩 방글라데시": [],
+
+        "🇵🇪 페루": [],
+        "🇨🇱 칠레": [],
+        "🇨🇴 콜롬비아": [],
+        "🇦🇷 아르헨티나": [],
+        "🇲🇽 멕시코": [],
+
+        "🇰🇷 기타 국내": []
+    }
 
     foreign = {
 
@@ -194,35 +212,43 @@ def group_news(news):
 
     for n in news:
 
-        # =========================
-        # 국내 방산 기사
-        # =========================
-        if is_korean_defense_news(n):
-
-            domestic_news.append(n)
-            continue
-
         title = n.get("title", "")
         summary = n.get("summary", "")
 
-        country = detect_country(title + summary)
+        combined = title + " " + summary
 
         # =========================
-        # 기타국가 제거
+        # 국내 방산 뉴스
         # =========================
+        if is_korean_defense_news(n):
+
+            country = detect_country(combined)
+
+            if country and country in domestic:
+                domestic[country].append(n)
+            else:
+                domestic["🇰🇷 기타 국내"].append(n)
+
+            continue
+
+        # =========================
+        # 해외 방산 뉴스
+        # =========================
+        country = detect_country(combined)
+
         if not country:
             continue
 
-        foreign.setdefault(country, [])
-        foreign[country].append(n)
+        if country in foreign:
+            foreign[country].append(n)
 
-    return domestic_news, foreign
+    return domestic, foreign
 
 
 # =========================
 # COUNT MESSAGE
 # =========================
-def build_count_message(domestic_news, foreign):
+def build_count_message(domestic, foreign):
 
     date = get_date()
 
@@ -235,7 +261,11 @@ def build_count_message(domestic_news, foreign):
     msg += "🇰🇷 <b>국내 방산 뉴스</b>\n"
     msg += "━━━━━━━━━━━━━━━\n\n"
 
-    msg += f"🇰🇷 한국 : {len(domestic_news)}건\n\n"
+    for country, articles in domestic.items():
+
+        msg += f"{country} : {len(articles)}건\n"
+
+    msg += "\n"
 
     # =========================
     # 해외
@@ -276,8 +306,14 @@ def build_message(title_text, articles):
         else:
             title_line = title
 
+        # =========================
+        # 제목 번역
+        # =========================
         translated_title = translate_title(title)
 
+        # =========================
+        # 3줄 요약
+        # =========================
         summary = summarize(summary_raw)
 
         msg += f"""
@@ -309,36 +345,40 @@ def main():
 
     print(f"수집 기사 수: {len(news)}")
 
-    domestic_news, foreign = group_news(news)
+    domestic, foreign = group_news(news)
 
-    # =========================
-    # 국내 메시지 생성
-    # =========================
-    domestic_msg = None
-
-    if domestic_news:
-
-        print("🇰🇷 국내 방산 뉴스 요약 중...")
-
-        domestic_msg = build_message(
-            "🇰🇷 <b>국내 방산 브리핑</b>",
-            domestic_news
-        )
-
-    # =========================
-    # 해외 메시지 생성
-    # =========================
+    domestic_msgs = []
     foreign_msgs = []
 
+    # =========================
+    # 국내 브리핑
+    # =========================
+    for country, articles in domestic.items():
+
+        if not articles:
+            continue
+
+        print(f"국내 {country} 요약 중...")
+
+        msg = build_message(
+            f"🇰🇷 <b>국내 방산 뉴스 - {country}</b>",
+            articles
+        )
+
+        domestic_msgs.append(msg)
+
+    # =========================
+    # 해외 브리핑
+    # =========================
     for country, articles in foreign.items():
 
         if not articles:
             continue
 
-        print(f"{country} 요약 중...")
+        print(f"해외 {country} 요약 중...")
 
         msg = build_message(
-            f"🌏 <b>{country} 방산 브리핑</b>",
+            f"🌏 <b>해외 방산 뉴스 - {country}</b>",
             articles
         )
 
@@ -347,31 +387,29 @@ def main():
     print("✅ 모든 뉴스 요약 완료")
 
     # =========================
-    # 1️⃣ 뉴스 현황
+    # 뉴스 현황
     # =========================
     send_message(
         build_count_message(
-            domestic_news,
+            domestic,
             foreign
         )
     )
 
     # =========================
-    # 2️⃣ 국내 브리핑
+    # 국내 브리핑
     # =========================
-    if domestic_msg:
-
-        send_message(domestic_msg)
-
-    # =========================
-    # 3️⃣ 해외 브리핑
-    # =========================
-    for msg in foreign_msgs:
-
+    for msg in domestic_msgs:
         send_message(msg)
 
     # =========================
-    # 4️⃣ 종료 메시지
+    # 해외 브리핑
+    # =========================
+    for msg in foreign_msgs:
+        send_message(msg)
+
+    # =========================
+    # 종료
     # =========================
     send_message(
         "✅ <b>일일 방산 브리핑 종료</b>"

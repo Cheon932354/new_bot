@@ -1,9 +1,9 @@
 from openai import OpenAI
 import os
 
+
 client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY"),
+    api_key=os.getenv("OPENAI_API_KEY")
 )
 
 
@@ -15,75 +15,101 @@ def translate_title(title):
     try:
 
         response = client.chat.completions.create(
-            model="openai/gpt-3.5-turbo",
+            model="gpt-4o-mini",
+
             messages=[
                 {
                     "role": "system",
-                    "content": """
-당신은 방산 전문 번역가이다.
-
-규칙:
-- 반드시 자연스러운 한국어로 번역
-- 무기체계 명칭(F-35, Patriot, K9 등)은 유지
-- 언론 기사 스타일로 번역
-- 불필요한 설명 금지
-"""
+                    "content":
+                    "Translate defense news titles into natural Korean."
                 },
                 {
                     "role": "user",
                     "content": title
                 }
             ],
-            max_tokens=120
+
+            max_tokens=100
         )
 
         return response.choices[0].message.content.strip()
 
     except Exception as e:
-        print("TITLE TRANSLATE ERROR:", e)
-        return "번역 실패"
+
+        print("제목 번역 실패:", e)
+
+        return title
 
 
 # =========================
-# 3줄 요약
+# 뉴스 요약
 # =========================
 def summarize(text):
+
+    # =========================
+    # fallback
+    # =========================
+    if not text or len(text.strip()) < 80:
+
+        return (
+            "• 기사 본문 요약 데이터 부족\n"
+            "• RSS 원문 기반 최신 방산 기사\n"
+            "• 상세 내용은 원문 기사 참고"
+        )
 
     try:
 
         response = client.chat.completions.create(
-            model="openai/gpt-3.5-turbo",
+
+            model="gpt-4o-mini",
+
             messages=[
+
                 {
                     "role": "system",
-                    "content": """
-당신은 한국 방산 전문 브리핑 분석관이다.
+                    "content":
+                    """
+                    You are a defense news analyst.
 
-반드시 한국어로만 답변하라.
+                    Summarize into Korean.
 
-규칙:
-- 영어 문장을 그대로 사용하지 말 것
-- 무기체계 명칭(F-35, Patriot, K9 등)만 영어 유지 가능
-- 나머지는 자연스러운 한국어로 번역
-- 제목 반복 금지
-- 반드시 정확히 3줄로 요약
-- 각 줄은 반드시 "-" 로 시작
-- 각 줄은 최대 40자 내외
-- 문장은 반드시 완결형
-- 문장이 끊기지 않게 작성
-- 간결하고 전문적으로 작성
-"""
+                    Rules:
+                    - EXACTLY 3 bullet points
+                    - concise but informative
+                    - preserve military/defense meaning
+                    - each bullet under 2 lines
+                    - no markdown
+                    """
                 },
+
                 {
                     "role": "user",
                     "content": text
                 }
             ],
-            max_tokens=300
+
+            max_tokens=220
         )
 
-        return response.choices[0].message.content.strip()
+        result = response.choices[0].message.content.strip()
+
+        # 빈 응답 방지
+        if not result:
+
+            return (
+                "• 요약 생성 실패\n"
+                "• 원문 기사 참고 필요\n"
+                "• 링크 통해 상세 확인 가능"
+            )
+
+        return result
 
     except Exception as e:
-        print("SUMMARY ERROR:", e)
-        return "요약 실패"
+
+        print("요약 실패:", e)
+
+        return (
+            "• OpenAI 요약 실패\n"
+            "• API 제한 또는 RSS 문제 가능\n"
+            "• 원문 기사 참고"
+        )

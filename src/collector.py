@@ -51,7 +51,7 @@ RSS_FEEDS = {
     "https://en.mercopress.com/rss",
 
     # =========================
-    # Google News RSS
+    # Google RSS
     # =========================
     "Google Brazil Defense":
     "https://news.google.com/rss/search?q=Brazil+defense",
@@ -81,7 +81,7 @@ RSS_FEEDS = {
     "https://news.google.com/rss/search?q=Vietnam+defense",
 
     # =========================
-    # 국내 방산
+    # 국내
     # =========================
     "연합뉴스 정치":
     "https://www.yna.co.kr/rss/politics.xml",
@@ -95,12 +95,13 @@ RSS_FEEDS = {
 
 
 # =========================
-# 최근 24시간 기사
+# 최근 뉴스 여부
 # =========================
 def is_recent_news(published):
 
+    # 날짜 없는 기사 허용
     if not published:
-        return False
+        return True
 
     try:
 
@@ -112,14 +113,15 @@ def is_recent_news(published):
 
         diff = now - article_time
 
-        return diff <= timedelta(days=1)
+        # 최근 48시간
+        return diff <= timedelta(days=2)
 
     except Exception:
-        return False
+        return True
 
 
 # =========================
-# 중복 제거용 제목 정리
+# 제목 정규화
 # =========================
 def normalize_title(title):
 
@@ -151,7 +153,7 @@ def collect_news():
 
     news_list = []
 
-    # 중복 제거용
+    # 중복 제거
     seen_titles = set()
     seen_links = set()
 
@@ -189,7 +191,7 @@ def collect_news():
                 )
 
                 # =========================
-                # 하루 이내 기사만
+                # 최신 뉴스 필터
                 # =========================
                 if not is_recent_news(published):
                     continue

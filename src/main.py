@@ -95,7 +95,6 @@ def is_korean_defense_news(article):
         "디펜스타임즈"
     ]
 
-    # 국내 RSS만 허용
     if source not in korean_sources:
         return False
 
@@ -138,7 +137,7 @@ def is_korean_defense_news(article):
         "수출",
         "협력",
 
-        # 해외 협력 국가
+        # 국가
         "브라질",
         "인도",
         "필리핀",
@@ -208,6 +207,9 @@ def group_news(news):
         "🇦🇷 아르헨티나": [],
         "🇲🇽 멕시코": [],
         "🇧🇷 브라질": [],
+
+        # 신규 추가
+        "🌍 기타 해외": [],
     }
 
     for n in news:
@@ -236,7 +238,10 @@ def group_news(news):
         # =========================
         country = detect_country(combined)
 
+        # 국가 인식 실패 시 기타 해외
         if not country:
+
+            foreign["🌍 기타 해외"].append(n)
             continue
 
         if country in foreign:
@@ -306,14 +311,8 @@ def build_message(title_text, articles):
         else:
             title_line = title
 
-        # =========================
-        # 제목 번역
-        # =========================
         translated_title = translate_title(title)
 
-        # =========================
-        # 3줄 요약
-        # =========================
         summary = summarize(summary_raw)
 
         msg += f"""

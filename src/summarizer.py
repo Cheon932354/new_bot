@@ -7,14 +7,13 @@ from openai import OpenAI
 
 
 # =========================
-# OpenAI Client
+# CLIENT
 # =========================
 def get_client():
 
     api_key = os.getenv("OPENAI_API_KEY")
 
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY 없음")
+    print("OPENAI EXISTS:", api_key is not None)
 
     return OpenAI(api_key=api_key)
 
@@ -49,7 +48,9 @@ def translate_title(title):
             max_tokens=100
         )
 
-        return response.choices[0].message.content.strip()
+        result = response.choices[0].message.content.strip()
+
+        return result
 
     except Exception as e:
 
@@ -86,16 +87,13 @@ def summarize(text):
                     "role": "system",
                     "content":
                     """
-                    You are a defense news analyst.
-
-                    Summarize into Korean.
+                    Summarize this defense news in Korean.
 
                     Rules:
                     - EXACTLY 3 bullet points
-                    - concise but informative
-                    - preserve defense/military meaning
-                    - each bullet under 2 lines
-                    - no markdown
+                    - concise
+                    - preserve military meaning
+                    - each bullet short
                     """
                 },
 
@@ -110,14 +108,6 @@ def summarize(text):
 
         result = response.choices[0].message.content.strip()
 
-        if not result:
-
-            return (
-                "• 요약 생성 실패\n"
-                "• 원문 기사 참고 필요\n"
-                "• 링크 통해 상세 확인 가능"
-            )
-
         return result
 
     except Exception as e:
@@ -126,6 +116,6 @@ def summarize(text):
 
         return (
             "• OpenAI 요약 실패\n"
-            "• API 제한 또는 RSS 문제 가능\n"
+            "• API 또는 RSS 문제 가능\n"
             "• 원문 기사 참고"
         )

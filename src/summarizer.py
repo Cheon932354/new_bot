@@ -1,146 +1,141 @@
 
-# =========================
-# src/summarizer.py
-# v2 최종 추천 버전
-# =========================
 
 import os
 from openai import OpenAI
 
+=========================
 
-# =========================
-# CLIENT
-# =========================
-API_KEY = os.getenv("OPENROUTER_API_KEY")
+CLIENT
 
-client = OpenAI(
-    api_key=API_KEY
+=========================
+
+def get_client():
+
+api_key = os.getenv("OPENROUTER_API_KEY")
+
+print(
+    "OPENROUTER KEY EXISTS:",
+    bool(api_key)
 )
 
+return OpenAI(
+    api_key=api_key,
+    base_url="https://openrouter.ai/api/v1"
+)
 
-# =========================
-# 제목 번역
-# =========================
+=========================
+
+TITLE TRANSLATION
+
+=========================
+
 def translate_title(title):
 
-    if not title:
-        return ""
+if not title:
+    return ""
 
-    try:
+try:
 
-        response = client.chat.completions.create(
+    client = get_client()
 
-            model="gpt-4o-mini",
+    response = client.chat.completions.create(
 
-            messages=[
+        model="google/gemini-2.5-flash",
 
-                {
-                    "role": "system",
-                    "content":
-                    """
-                    당신은 방산 전문 번역가다.
+        messages=[
 
-                    규칙:
-                    - 자연스러운 한국어
-                    - 제목만 출력
-                    - 설명 금지
-                    """
-                },
+            {
+                "role": "system",
+                "content":
+                """
+                Translate defense news titles into natural Korean.
 
-                {
-                    "role": "user",
-                    "content": title
-                }
-            ],
+                Rules:
+                - Only output Korean title
+                - No explanation
+                - Keep military terms accurate
+                """
+            },
 
-            max_tokens=120
-        )
+            {
+                "role": "user",
+                "content": title
+            }
+        ],
 
-        result = (
-            response
-            .choices[0]
-            .message
-            .content
-            .strip()
-        )
+        max_tokens=100
+    )
 
-        return result
+    return (
+        response
+        .choices[0]
+        .message
+        .content
+        .strip()
+    )
 
-    except Exception as e:
+except Exception as e:
 
-        print(
-            "제목 번역 실패:",
-            e
-        )
+    print("제목 번역 실패:", e)
 
-        return title
+    return title
 
+=========================
 
-# =========================
-# 1줄 요약
-# =========================
-def summarize(title, summary):
+ONE LINE SUMMARY
 
-    text = f"""
-제목:
-{title}
+=========================
 
-내용:
-{summary}
+def summarize(text):
+
+if not text:
+
+    return "기사 요약 정보 없음"
+
+try:
+
+    client = get_client()
+
+    response = client.chat.completions.create(
+
+        model="google/gemini-2.5-flash",
+
+        messages=[
+
+            {
+                "role": "system",
+                "content":
+                """
+                Summarize defense news in Korean.
+
+                Rules:
+                - One sentence only
+                - Maximum 50 characters
+                - Focus on the key defense event
+                """
+            },
+
+            {
+                "role": "user",
+                "content": text[:4000]
+            }
+        ],
+
+        max_tokens=80
+    )
+
+    return (
+        response
+        .choices[0]
+        .message
+        .content
+        .strip()
+    )
+
+except Exception as e:
+
+    print("요약 실패:", e)
+
+    return "기사 핵심 내용 확인 필요"
+
 """
-
-    try:
-
-        response = client.chat.completions.create(
-
-            model="gpt-4o-mini",
-
-            messages=[
-
-                {
-                    "role": "system",
-                    "content":
-                    """
-                    당신은 국방 전문 분석가다.
-
-                    반드시 한국어로 작성하라.
-
-                    규칙:
-
-                    - 1문장만 작성
-                    - 50자 이내
-                    - 기사 핵심만 작성
-                    - 불필요한 수식어 금지
-                    - 문장 앞에 기호 금지
-                    """
-                },
-
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ],
-
-            max_tokens=80
-        )
-
-        result = (
-            response
-            .choices[0]
-            .message
-            .content
-            .strip()
-        )
-
-        return result
-
-    except Exception as e:
-
-        print(
-            "요약 실패:",
-            e
-        )
-
-        return (
-            "기사 핵심 내용 확인 필요"
-        )

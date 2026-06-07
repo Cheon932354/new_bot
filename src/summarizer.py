@@ -74,7 +74,7 @@ def translate_title(title):
 # =========================
 # 1줄 요약
 # =========================
-def summarize(text):
+def summarize(title, text):
 
     if not text:
 
@@ -83,6 +83,14 @@ def summarize(text):
     try:
 
         client = get_client()
+
+        content = f"""
+제목:
+{title}
+
+본문:
+{text}
+"""
 
         response = client.chat.completions.create(
 
@@ -103,7 +111,7 @@ def summarize(text):
                 },
                 {
                     "role": "user",
-                    "content": text[:4000]
+                    "content": content[:4000]
                 }
             ],
 

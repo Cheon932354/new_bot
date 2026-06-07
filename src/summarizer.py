@@ -11,7 +11,7 @@ from openai import OpenAI
 # =========================
 # CLIENT
 # =========================
-API_KEY = os.getenv("OPENAI_API_KEY")
+API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 client = OpenAI(
     api_key=API_KEY

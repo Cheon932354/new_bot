@@ -6,6 +6,11 @@
 import os
 import requests
 
+print(
+    "OPENAI KEY:",
+    bool(os.getenv("OPENAI_API_KEY"))
+)
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
 

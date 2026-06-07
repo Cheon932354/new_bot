@@ -6,10 +6,10 @@
 import os
 import requests
 
-print(
-    "OPENAI KEY:",
-    bool(os.getenv("OPENAI_API_KEY"))
-)
+print("===== DEBUG =====")
+print("OPENAI KEY EXISTS:", bool(os.getenv("OPENAI_API_KEY")))
+print("TELEGRAM TOKEN EXISTS:", bool(os.getenv("TELEGRAM_TOKEN")))
+print("=================")
 
 from datetime import datetime
 from zoneinfo import ZoneInfo

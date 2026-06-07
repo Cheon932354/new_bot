@@ -1,141 +1,125 @@
-
+# =========================
+# src/summarizer.py
+# OpenRouter 버전
+# =========================
 
 import os
 from openai import OpenAI
 
-=========================
 
-CLIENT
-
-=========================
-
+# =========================
+# CLIENT
+# =========================
 def get_client():
 
-api_key = os.getenv("OPENROUTER_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY")
 
-print(
-    "OPENROUTER KEY EXISTS:",
-    bool(api_key)
-)
+    print(
+        "OPENROUTER KEY EXISTS:",
+        bool(api_key)
+    )
 
-return OpenAI(
-    api_key=api_key,
-    base_url="https://openrouter.ai/api/v1"
-)
+    return OpenAI(
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1"
+    )
 
-=========================
 
-TITLE TRANSLATION
-
-=========================
-
+# =========================
+# 제목 번역
+# =========================
 def translate_title(title):
 
-if not title:
-    return ""
+    if not title:
+        return ""
 
-try:
+    try:
 
-    client = get_client()
+        client = get_client()
 
-    response = client.chat.completions.create(
+        response = client.chat.completions.create(
 
-        model="google/gemini-2.5-flash",
+            model="google/gemini-2.5-flash",
 
-        messages=[
+            messages=[
+                {
+                    "role": "system",
+                    "content":
+                    "Translate defense news titles into natural Korean. Output Korean only."
+                },
+                {
+                    "role": "user",
+                    "content": title
+                }
+            ],
 
-            {
-                "role": "system",
-                "content":
-                """
-                Translate defense news titles into natural Korean.
+            max_tokens=100
+        )
 
-                Rules:
-                - Only output Korean title
-                - No explanation
-                - Keep military terms accurate
-                """
-            },
+        return (
+            response
+            .choices[0]
+            .message
+            .content
+            .strip()
+        )
 
-            {
-                "role": "user",
-                "content": title
-            }
-        ],
+    except Exception as e:
 
-        max_tokens=100
-    )
+        print("제목 번역 실패:", e)
 
-    return (
-        response
-        .choices[0]
-        .message
-        .content
-        .strip()
-    )
+        return title
 
-except Exception as e:
 
-    print("제목 번역 실패:", e)
-
-    return title
-
-=========================
-
-ONE LINE SUMMARY
-
-=========================
-
+# =========================
+# 1줄 요약
+# =========================
 def summarize(text):
 
-if not text:
+    if not text:
 
-    return "기사 요약 정보 없음"
+        return "기사 요약 정보 없음"
 
-try:
+    try:
 
-    client = get_client()
+        client = get_client()
 
-    response = client.chat.completions.create(
+        response = client.chat.completions.create(
 
-        model="google/gemini-2.5-flash",
+            model="google/gemini-2.5-flash",
 
-        messages=[
+            messages=[
+                {
+                    "role": "system",
+                    "content":
+                    """
+                    Summarize defense news in Korean.
 
-            {
-                "role": "system",
-                "content":
-                """
-                Summarize defense news in Korean.
+                    Rules:
+                    - One sentence only
+                    - Maximum 50 characters
+                    - Focus on the main defense event
+                    """
+                },
+                {
+                    "role": "user",
+                    "content": text[:4000]
+                }
+            ],
 
-                Rules:
-                - One sentence only
-                - Maximum 50 characters
-                - Focus on the key defense event
-                """
-            },
+            max_tokens=80
+        )
 
-            {
-                "role": "user",
-                "content": text[:4000]
-            }
-        ],
+        return (
+            response
+            .choices[0]
+            .message
+            .content
+            .strip()
+        )
 
-        max_tokens=80
-    )
+    except Exception as e:
 
-    return (
-        response
-        .choices[0]
-        .message
-        .content
-        .strip()
-    )
+        print("요약 실패:", e)
 
-except Exception as e:
-
-    print("요약 실패:", e)
-
-    return "기사 핵심 내용 확인 필요"
-
-"""
+        return "기사 핵심 내용 확인 필요"

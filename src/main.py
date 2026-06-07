@@ -464,12 +464,15 @@ def build_message(
 # =========================
 def main():
 
-    if not is_workday():
+#    if not is_workday():
 
-        print(
-            "주말/공휴일 종료"
-        )
+#        print(
+#            "주말/공휴일 종료"
+#        )
 
+ #       return
+
+    if False:
         return
 
     print(

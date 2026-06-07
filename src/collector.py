@@ -232,18 +232,21 @@ RSS_FEEDS = {
 # =========================
 # 날짜 검사
 # =========================
+
 def is_recent_news(published):
 
-    # 날짜 없는 RSS 허용
+    # 날짜 없으면 제외
     if not published:
-        return True
+        return False
 
     try:
 
-        article_time = parsedate_to_datetime(published)
+        article_time = parsedate_to_datetime(
+            published
+        )
 
-        now = datetime.utcnow(
-            tzinfo=article_time.tzinfo
+        now = datetime.now(
+            article_time.tzinfo
         )
 
         diff = now - article_time
@@ -252,20 +255,25 @@ def is_recent_news(published):
         if diff.total_seconds() < 0:
             return False
 
-        # 최근 48시간
-        return diff <= timedelta(days=2)
+        # 최근 72시간
+        return diff <= timedelta(
+            hours=72
+        )
 
-    except Exception:
+    except Exception as e:
 
-        print("날짜 파싱 실패:", published)
+        print(
+            "날짜 파싱 실패:",
+            published
+        )
 
-        # Google RSS 대응
-        return True
+        return False
 
 
 # =========================
 # 제목 정규화
 # =========================
+
 def normalize_title(title):
 
     if not title:
@@ -274,17 +282,29 @@ def normalize_title(title):
     title = title.lower()
 
     remove_words = [
+
         "[updated]",
         "(updated)",
+
         "|",
         "-",
-        ":"
+        ":",
+        ",",
+
+        "breaking:",
+        "exclusive:"
     ]
 
-    for w in remove_words:
-        title = title.replace(w, " ")
+    for word in remove_words:
 
-    title = " ".join(title.split())
+        title = title.replace(
+            word,
+            " "
+        )
+
+    title = " ".join(
+        title.split()
+    )
 
     return title.strip()
 
@@ -292,6 +312,7 @@ def normalize_title(title):
 # =========================
 # 뉴스 수집
 # =========================
+
 def collect_news():
 
     news_list = []
@@ -301,81 +322,153 @@ def collect_news():
 
     for source, url in RSS_FEEDS.items():
 
-        print(f"\n📡 수집 중: {source}")
+        print(
+            f"\n📡 수집 중: {source}"
+        )
 
         try:
 
-            feed = feedparser.parse(url)
+            feed = feedparser.parse(
+                url
+            )
 
-            for entry in feed.entries[:20]:
+            entries = feed.entries[:50]
 
-                title = entry.get("title", "")
-                link = entry.get("link", "")
+            for entry in entries:
 
-                normalized = normalize_title(title)
-
-                published = (
-                    entry.get("published", "")
-                    or entry.get("updated", "")
-                    or entry.get("pubDate", "")
+                title = (
+                    entry.get(
+                        "title",
+                        ""
+                    )
                 )
 
-                # =========================
-                # 날짜 필터
-                # =========================
-
-                # Google RSS는 유연 처리
-                if "google.com/rss" in url:
-
-                    try:
-
-                        if not is_recent_news(published):
-                            continue
-
-                    except:
-                        pass
-
-                # 일반 RSS는 엄격 처리
-                else:
-
-                    if not is_recent_news(published):
-                        continue
-
-                # =========================
-                # 중복 제거
-                # =========================
-                if link in seen_links:
-                    continue
-
-                if normalized in seen_titles:
-                    continue
+                link = (
+                    entry.get(
+                        "link",
+                        ""
+                    )
+                )
 
                 summary = (
-                    entry.get("summary", "")
-                    or entry.get("description", "")
+
+                    entry.get(
+                        "summary",
+                        ""
+                    )
+
+                    or
+
+                    entry.get(
+                        "description",
+                        ""
+                    )
                 )
 
-                news = {
+                published = (
 
-                    "source": source,
-                    "title": title,
-                    "summary": summary,
-                    "link": link,
-                    "published": published
+                    entry.get(
+                        "published",
+                        ""
+                    )
+
+                    or
+
+                    entry.get(
+                        "updated",
+                        ""
+                    )
+
+                    or
+
+                    entry.get(
+                        "pubDate",
+                        ""
+                    )
+                )
+
+                # =====================
+                # 날짜 필터
+                # =====================
+
+                if not is_recent_news(
+                    published
+                ):
+                    continue
+
+                # =====================
+                # 중복 제거
+                # =====================
+
+                normalized_title = (
+                    normalize_title(
+                        title
+                    )
+                )
+
+                normalized_link = (
+                    link.split("?")[0]
+                )
+
+                if (
+                    normalized_title
+                    in seen_titles
+                ):
+                    continue
+
+                if (
+                    normalized_link
+                    in seen_links
+                ):
+                    continue
+
+                article = {
+
+                    "source":
+                    source,
+
+                    "title":
+                    title,
+
+                    "summary":
+                    summary,
+
+                    "link":
+                    link,
+
+                    "published":
+                    published
                 }
 
-                news_list.append(news)
+                news_list.append(
+                    article
+                )
 
-                seen_titles.add(normalized)
-                seen_links.add(link)
+                seen_titles.add(
+                    normalized_title
+                )
 
-                print("✅", title)
+                seen_links.add(
+                    normalized_link
+                )
+
+                print(
+                    "✅",
+                    title[:80]
+                )
 
         except Exception as e:
 
-            print(f"❌ RSS ERROR ({source})")
+            print(
+                f"❌ RSS ERROR "
+                f"({source})"
+            )
+
             print(e)
 
-    print(f"\n📰 최종 기사 수: {len(news_list)}")
+    print(
+        f"\n📰 최종 기사 수: "
+        f"{len(news_list)}"
+    )
 
     return news_list
